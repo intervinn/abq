@@ -5,7 +5,7 @@ import "testing"
 func TestAssignStmt(t *testing.T) {
 	s := &AssignStmt{
 		Tok: ASSIGN,
-		Lhs: []Node{
+		Lhs: []*Ident{
 			&Ident{
 				Name: "foo",
 			},
