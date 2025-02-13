@@ -2,15 +2,19 @@ package luau
 
 // Base node
 type Node interface {
-	Render() string
+	Render(w Writer) string
 }
 
-// Statement
-type Stmt interface {
-	Node
+type Writer interface {
+	Write(s string) error
+	Line(s string) error
+	Indent() int
 }
 
-// Expression
-type Expr interface {
-	Node
-}
+type Scope int
+
+const (
+	GLOBAL Scope = iota
+	LOCAL
+	NONE
+)

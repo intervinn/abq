@@ -1,153 +1,123 @@
 package luau
 
-import "strings"
-
-// A basic literal for strings and numberss
-type BasicLit struct {
-	Kind  Token
-	Value string
+// Block is a basic container of nodes
+type Block struct {
+	List []Node
 }
 
-func (b *BasicLit) Render() string {
-	return b.Value
-}
-
-// Anonymous function literal
-type FuncLit struct {
-	Type *FuncType
-	Body *BlockStmt
-}
-
-// Assign statement, do not confuse with declaration statement
-// Ex: foo = 5
-type AssignStmt struct {
-	Tok Token
-	Rhs []Node   // lit
-	Lhs []*Ident // ident
-}
-
-func (a *AssignStmt) Render() string {
-	rhs := make([]string, len(a.Rhs))
-	for i, h := range a.Rhs {
-		rhs[i] = h.Render()
+func (c *Block) Render(w Writer) {
+	for _, n := range c.List {
+		w.Line(n.Render(w))
 	}
-
-	lhs := make([]string, len(a.Lhs))
-	for i, h := range a.Lhs {
-		lhs[i] = h.Render()
-	}
-
-	return strings.Join(lhs, ",") + " = " + strings.Join(rhs, ",")
 }
 
-// Variable declaration statement
-// Ex: local foo = 5
-type DeclStmt struct {
-	Idt  *Ident // ident
-	Val  Node
-	Type Node
-}
-
-func (d *DeclStmt) Render() string {
-	return "local" + d.Idt.Render() + " = " + d.Val.Render()
-}
-
-// An expression statement
-type ExprStmt struct {
-	Expr Expr
-}
-
-func (e *ExprStmt) Render() string {
-	return e.Expr.Render()
-}
-
-// Block statement holds a list of statements within
-// and is usable as a function body, loop body, if statement body, and a do-end block
-type BlockStmt struct {
-	List []Stmt
-}
-
-func (b *BlockStmt) Render() {
-
-}
-
-// An identifier that holds the name of variables, fields, and whatever
+// Identifier
 type Ident struct {
 	Name string
 }
 
-func (i *Ident) Render() string {
-	return i.Name
+func (i *Ident) Render(w Writer) {
+	w.Write(i.Name)
 }
 
-// Do not confuse with FuncLit, implements rendering of a function type definition
-type FuncType struct {
-	Params  []Field
-	Results []Field
+// Do-end block
+// ex: do print("hi") end
+type DoBlock struct {
+	Block *Block
 }
 
-func (f *FuncType) Render() string {
-	params := make([]string, len(f.Params))
+func (d *DoBlock) Render(w Writer) {
+	w.Line("do")
+	d.Block.Render(w)
+	w.Line("end")
+}
+
+// While block
+// ex: while true do print("hi") end
+type WhileBlock struct {
+	Exp   Node
+	Block *Block
+}
+
+func (wh *WhileBlock) Render(w Writer) {
+	w.Write("while ")
+	wh.Exp.Render(w)
+	w.Line("do")
+
+	wh.Block.Render(w)
+	w.Line("end")
+}
+
+// For block
+// ex: for i = 1,10,1 do end
+// ex: for i,v in pairs({1,2,3}) do end
+type ForBlock struct {
+	Block *Block
+	Exp   Node
+}
+
+func (f *ForBlock) Render(w Writer) {
+
+}
+
+// Var declaration
+// ex: local foo,bar = 4,2
+type VarDecl struct {
+	Scope  Scope
+	Names  []Ident
+	Values []Node
+}
+
+func (v *VarDecl) Render(w Writer) {
+	if v.Scope == LOCAL {
+		w.Write("local ")
+	}
+	for i, n := range v.Names {
+		n.Render(w)
+		if i != len(v.Names)-1 {
+			w.Write(",")
+		}
+	}
+	w.Write(" = ")
+	for i, n := range v.Values {
+		n.Render(w)
+		if i != len(v.Values)-1 {
+			w.Write(",")
+		}
+	}
+}
+
+// Function
+// Works both as a declaration and a literal
+// ex: local foo = function()
+// ex: function foo()
+type Function struct {
+	Name   Node
+	Params []Ident
+	Block  *Block
+	Scope  Scope
+}
+
+func (f *Function) Render(w Writer) {
+	if f.Scope == LOCAL {
+		w.Write("local ")
+	}
+
+	w.Write("function")
+
+	if f.Scope != NONE {
+		w.Write(f.Name.Render(w))
+	}
+
+	w.Write("(")
 	for i, p := range f.Params {
-		params[i] = p.Render()
+		p.Render(w)
+		if i != len(f.Params)-1 {
+			w.Write(",")
+		}
 	}
+	w.Line(")")
 
-	results := make([]string, len(f.Params))
-	for i, r := range f.Results {
-		params[i] = r.Render()
-	}
-
-	return "(" + strings.Join(params, ",") + ")" + " -> (" + strings.Join(results, ",") + ")"
-}
-
-// Field is a common syntax used when declaring function parameters
-// and table type keys
-type Field struct {
-	Type Node
-	Name *Ident
-}
-
-func (f *Field) Render() string {
-	return f.Name.Render() + ": " + f.Type.Render()
-}
-
-// Basic Types
-type (
-	StringType   struct{}
-	NumberType   struct{}
-	BoolType     struct{}
-	NilType      struct{}
-	TableType    struct{}
-	ThreadType   struct{}
-	UserDataType struct{}
-	VectorType   struct{}
-	BufferType   struct{}
-)
-
-func (s *StringType) Render() string {
-	return "string"
-}
-func (n *NumberType) Render() string {
-	return "number"
-}
-func (b *BoolType) Render() string {
-	return "boolean"
-}
-func (u *UserDataType) Render() string {
-	return "userdata"
-}
-func (v *VectorType) Render() string {
-	return "vector"
-}
-func (b *BufferType) Render() string {
-	return "buffer"
-}
-func (t *ThreadType) Render() string {
-	return "thread"
-}
-func (t *TableType) Render() string {
-	return "table"
-}
-func (n *NilType) Render() string {
-	return "nil"
+	f.Block.Render(w)
+	w.Line("end")
 }
