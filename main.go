@@ -8,14 +8,14 @@ import (
 
 func main() {
 	w := luau.NewStringWriter()
-	t := &luau.FuncDecl{
+	t := &luau.FuncStmt{
 		Name: &luau.Ident{Name: "foo"},
 		Params: []*luau.Ident{
 			{Name: "x"},
 		},
 		Block: &luau.Block{
 			List: []luau.Node{
-				&luau.VarDecl{
+				&luau.DeclStmt{
 					Scope: luau.LOCAL,
 					Names: []*luau.Ident{
 						{Name: "a"},

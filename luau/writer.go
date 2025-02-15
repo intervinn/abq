@@ -27,10 +27,6 @@ func (sw *StringWriter) Write(s string) error {
 	return nil
 }
 
-func (sw *StringWriter) End(s string) error {
-	return sw.Pre(s + "\n")
-}
-
 func (sw *StringWriter) IncIndent() {
 	sw.indent++
 }

@@ -10,8 +10,6 @@ type Writer interface {
 	Pre(s string) error
 	// Write will just add the string
 	Write(s string) error
-	// End will add both the indent and a newline
-	End(s string) error
 
 	Indent() int
 	IncIndent()
@@ -26,10 +24,10 @@ const (
 	NONE
 )
 
-type Operator int
+type Token int
 
 const (
-	ILLEGAL Operator = iota
+	ILLEGAL Token = iota
 
 	ADD  // +
 	SUB  // -
@@ -62,9 +60,12 @@ const (
 	GTR // >
 
 	LEN // #
+
+	BREAK    // break
+	CONTINUE // continue
 )
 
-func FormatOperator(o Operator) string {
+func FormatToken(o Token) string {
 	switch o {
 	case ADD:
 		return "+"

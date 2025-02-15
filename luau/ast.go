@@ -29,9 +29,9 @@ type DoStmt struct {
 }
 
 func (d *DoStmt) Render(w Writer) {
-	w.End("do")
+	w.Pre("do\n")
 	d.Block.Render(w)
-	w.End("end")
+	w.Pre("end\n")
 }
 
 // While block
@@ -42,12 +42,12 @@ type WhileStmt struct {
 }
 
 func (wh *WhileStmt) Render(w Writer) {
-	w.Write("while ")
+	w.Pre("while ")
 	wh.Exp.Render(w)
-	w.End("do")
+	w.Write("do\n")
 
 	wh.Block.Render(w)
-	w.End("end")
+	w.Pre("end\n")
 }
 
 // For block
@@ -64,13 +64,13 @@ func (f *ForStmt) Render(w Writer) {
 
 // Var declaration
 // ex: local foo,bar = 4,2
-type VarDecl struct {
+type DeclStmt struct {
 	Scope  Scope
 	Names  []*Ident
 	Values []Node
 }
 
-func (v *VarDecl) Render(w Writer) {
+func (v *DeclStmt) Render(w Writer) {
 	if v.Scope == LOCAL {
 		w.Pre("local ")
 	}
@@ -90,16 +90,69 @@ func (v *VarDecl) Render(w Writer) {
 	w.Write("\n")
 }
 
+// Assignment statement
+// ex: a = 5
+type AssignStmt struct {
+	Left  []Node
+	Right []Node
+}
+
+func (a *AssignStmt) Render(w Writer) {
+	for i, p := range a.Left {
+		p.Render(w)
+		if i != len(a.Left)-1 {
+			w.Write(",")
+		}
+	}
+	w.Write(" = ")
+	for i, p := range a.Right {
+		p.Render(w)
+		if i != len(a.Right)-1 {
+			w.Write(",")
+		}
+	}
+	w.Write("\n")
+}
+
+// Expression statement
+// ex: print("hello")
+type ExprStmt struct {
+	X Node
+}
+
+func (e *ExprStmt) Render(w Writer) {
+	w.Pre("")
+	e.X.Render(w)
+	w.Write("\n")
+}
+
+// Return statement
+// ex: return 4,2
+type ReturnStmt struct {
+	Results []Node
+}
+
+func (r *ReturnStmt) Render(w Writer) {
+	w.Pre("return ")
+	for i, rs := range r.Results {
+		rs.Render(w)
+		if i != len(r.Results)-1 {
+			w.Write(",")
+		}
+	}
+	w.Write("\n")
+}
+
 // Function declaraion
 // ex: function foo() end
-type FuncDecl struct {
+type FuncStmt struct {
 	Name   *Ident
 	Params []*Ident
 	Block  *Block
 	Scope  Scope
 }
 
-func (f *FuncDecl) Render(w Writer) {
+func (f *FuncStmt) Render(w Writer) {
 	if f.Scope == LOCAL {
 		w.Pre("local ")
 	}
@@ -115,10 +168,10 @@ func (f *FuncDecl) Render(w Writer) {
 			w.Write(",")
 		}
 	}
-	w.End(")")
+	w.Write(")\n")
 
 	f.Block.Render(w)
-	w.End("end")
+	w.Write("end\n")
 }
 
 // Function literal
@@ -139,10 +192,10 @@ func (f *FuncLit) Render(w Writer) {
 			w.Write(",")
 		}
 	}
-	w.End(")")
+	w.Write(")\n")
 
 	f.Block.Render(w)
-	w.End("end")
+	w.Write("end\n")
 }
 
 // Numeric literal
@@ -185,12 +238,12 @@ func (c *CallExpr) Render(w Writer) {
 // Index expression
 // ex: table["index"]
 type IndexExpr struct {
-	Sub   Node
+	X     Node
 	Index Node
 }
 
 func (i *IndexExpr) Render(w Writer) {
-	i.Sub.Render(w)
+	i.X.Render(w)
 	w.Write("[")
 	i.Index.Render(w)
 	w.Write("]\n")
@@ -199,12 +252,12 @@ func (i *IndexExpr) Render(w Writer) {
 // Selector expression
 // ex: table.property
 type SelectorExpr struct {
-	Sub Node
+	X   Node
 	Sel *Ident
 }
 
 func (s *SelectorExpr) Render(w Writer) {
-	s.Sub.Render(w)
+	s.X.Render(w)
 	w.Write(".")
 	s.Sel.Render(w)
 }
@@ -214,23 +267,23 @@ func (s *SelectorExpr) Render(w Writer) {
 type BinaryExpr struct {
 	Left  Node
 	Right Node
-	Op    Operator
+	Op    Token
 }
 
 func (b *BinaryExpr) Render(w Writer) {
 	b.Left.Render(w)
-	w.Write(FormatOperator(b.Op))
+	w.Write(FormatToken(b.Op))
 	b.Right.Render(w)
 }
 
 // Parenthesized expression
 // ex: (2 + 2) * 2
 type ParenExpr struct {
-	Sub Node
+	X Node
 }
 
 func (p *ParenExpr) Render(w Writer) {
 	w.Write("(")
-	p.Sub.Render(w)
+	p.X.Render(w)
 	w.Write(")")
 }
