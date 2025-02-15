@@ -6,9 +6,11 @@ type Block struct {
 }
 
 func (c *Block) Render(w Writer) {
+	w.IncIndent()
 	for _, n := range c.List {
-		w.Line(n.Render(w))
+		n.Render(w)
 	}
+	w.DecIndent()
 }
 
 // Identifier
@@ -22,41 +24,41 @@ func (i *Ident) Render(w Writer) {
 
 // Do-end block
 // ex: do print("hi") end
-type DoBlock struct {
+type DoStmt struct {
 	Block *Block
 }
 
-func (d *DoBlock) Render(w Writer) {
-	w.Line("do")
+func (d *DoStmt) Render(w Writer) {
+	w.End("do")
 	d.Block.Render(w)
-	w.Line("end")
+	w.End("end")
 }
 
 // While block
 // ex: while true do print("hi") end
-type WhileBlock struct {
+type WhileStmt struct {
 	Exp   Node
 	Block *Block
 }
 
-func (wh *WhileBlock) Render(w Writer) {
+func (wh *WhileStmt) Render(w Writer) {
 	w.Write("while ")
 	wh.Exp.Render(w)
-	w.Line("do")
+	w.End("do")
 
 	wh.Block.Render(w)
-	w.Line("end")
+	w.End("end")
 }
 
 // For block
 // ex: for i = 1,10,1 do end
 // ex: for i,v in pairs({1,2,3}) do end
-type ForBlock struct {
+type ForStmt struct {
 	Block *Block
 	Exp   Node
 }
 
-func (f *ForBlock) Render(w Writer) {
+func (f *ForStmt) Render(w Writer) {
 
 }
 
@@ -64,13 +66,13 @@ func (f *ForBlock) Render(w Writer) {
 // ex: local foo,bar = 4,2
 type VarDecl struct {
 	Scope  Scope
-	Names  []Ident
+	Names  []*Ident
 	Values []Node
 }
 
 func (v *VarDecl) Render(w Writer) {
 	if v.Scope == LOCAL {
-		w.Write("local ")
+		w.Pre("local ")
 	}
 	for i, n := range v.Names {
 		n.Render(w)
@@ -85,29 +87,26 @@ func (v *VarDecl) Render(w Writer) {
 			w.Write(",")
 		}
 	}
+	w.Write("\n")
 }
 
-// Function
-// Works both as a declaration and a literal
-// ex: local foo = function()
-// ex: function foo()
-type Function struct {
-	Name   Node
-	Params []Ident
+// Function declaraion
+// ex: function foo() end
+type FuncDecl struct {
+	Name   *Ident
+	Params []*Ident
 	Block  *Block
 	Scope  Scope
 }
 
-func (f *Function) Render(w Writer) {
+func (f *FuncDecl) Render(w Writer) {
 	if f.Scope == LOCAL {
-		w.Write("local ")
+		w.Pre("local ")
 	}
 
-	w.Write("function")
+	w.Write("function ")
 
-	if f.Scope != NONE {
-		w.Write(f.Name.Render(w))
-	}
+	f.Name.Render(w)
 
 	w.Write("(")
 	for i, p := range f.Params {
@@ -116,8 +115,122 @@ func (f *Function) Render(w Writer) {
 			w.Write(",")
 		}
 	}
-	w.Line(")")
+	w.End(")")
 
 	f.Block.Render(w)
-	w.Line("end")
+	w.End("end")
+}
+
+// Function literal
+// ex: local x = function() end
+type FuncLit struct {
+	Name   *Ident
+	Params []*Ident
+	Block  *Block
+}
+
+func (f *FuncLit) Render(w Writer) {
+	w.Pre("function ")
+	w.Write("(")
+
+	for i, p := range f.Params {
+		p.Render(w)
+		if i != len(f.Params) {
+			w.Write(",")
+		}
+	}
+	w.End(")")
+
+	f.Block.Render(w)
+	w.End("end")
+}
+
+// Numeric literal
+// ex: 152.123
+type NumericLit struct {
+	Value string
+}
+
+func (n *NumericLit) Render(w Writer) {
+	w.Write(n.Value)
+}
+
+// String literal
+// ex: "aa"
+type StringLit struct {
+	Value string
+}
+
+func (s *StringLit) Render(w Writer) {
+	w.Write("\"" + s.Value + "\"")
+}
+
+// Call expression
+// ex: foo()
+type CallExpr struct {
+	Args []Node
+	Fun  Ident
+}
+
+func (c *CallExpr) Render(w Writer) {
+	c.Fun.Render(w)
+	for i, a := range c.Args {
+		a.Render(w)
+		if i != len(c.Args)-1 {
+			w.Write(",")
+		}
+	}
+}
+
+// Index expression
+// ex: table["index"]
+type IndexExpr struct {
+	Sub   Node
+	Index Node
+}
+
+func (i *IndexExpr) Render(w Writer) {
+	i.Sub.Render(w)
+	w.Write("[")
+	i.Index.Render(w)
+	w.Write("]\n")
+}
+
+// Selector expression
+// ex: table.property
+type SelectorExpr struct {
+	Sub Node
+	Sel *Ident
+}
+
+func (s *SelectorExpr) Render(w Writer) {
+	s.Sub.Render(w)
+	w.Write(".")
+	s.Sel.Render(w)
+}
+
+// Binary expression
+// ex: 2 + 2
+type BinaryExpr struct {
+	Left  Node
+	Right Node
+	Op    Operator
+}
+
+func (b *BinaryExpr) Render(w Writer) {
+	b.Left.Render(w)
+	w.Write(FormatOperator(b.Op))
+	b.Right.Render(w)
+}
+
+// Parenthesized expression
+// ex: (2 + 2) * 2
+type ParenExpr struct {
+	Sub Node
+}
+
+func (p *ParenExpr) Render(w Writer) {
+	w.Write("(")
+	p.Sub.Render(w)
+	w.Write(")")
 }
