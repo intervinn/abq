@@ -17,9 +17,9 @@ func main() {
 			List: []luau.Node{
 				&luau.DeclStmt{
 					Scope: luau.LOCAL,
-					Names: []*luau.Ident{
-						{Name: "a"},
-						{Name: "b"},
+					Names: []luau.Node{
+						&luau.Ident{Name: "a"},
+						&luau.Ident{Name: "b"},
 					},
 					Values: []luau.Node{
 						&luau.NumericLit{Value: "123.512"},

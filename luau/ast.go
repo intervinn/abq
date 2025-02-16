@@ -14,7 +14,6 @@ func (b *Chunk) Render(w Writer) {
 }
 
 // Block is meant for internal use, whenever one node should be transformed into multiple
-
 type Block struct {
 	List []Node
 }
@@ -32,6 +31,36 @@ type Ident struct {
 
 func (i *Ident) Render(w Writer) {
 	w.Write(i.Name)
+}
+
+// If statement
+// ex: if true then end
+type IfStmt struct {
+	Cond Node
+	Body *Chunk
+	Else Node
+}
+
+func (i *IfStmt) Render(w Writer) {
+	w.Pre("if ")
+	i.Cond.Render(w)
+	w.Write(" then\n")
+
+	i.Body.Render(w)
+
+	if elseif, ok := i.Else.(*IfStmt); ok {
+		w.Pre("elseif ")
+		elseif.Cond.Render(w)
+		w.Write(" then\n")
+		elseif.Body.Render(w)
+		w.Pre("else")
+		elseif.Else.Render(w)
+	} else {
+		w.Pre("else\n")
+		i.Else.Render(w)
+	}
+
+	w.Pre("end\n")
 }
 
 // Do-end Chunk
@@ -78,7 +107,7 @@ func (f *ForStmt) Render(w Writer) {
 // ex: local foo,bar = 4,2
 type DeclStmt struct {
 	Scope  Scope
-	Names  []*Ident
+	Names  []Node
 	Values []Node
 }
 

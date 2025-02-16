@@ -157,6 +157,18 @@ func BinaryExpr(e *ast.BinaryExpr) (*luau.BinaryExpr, error) {
 		return nil, err
 	}
 
+	{
+		if _, srok := right.(*luau.StringLit); srok {
+			if op == luau.ADD_ASSIGN {
+				op = luau.CCT_ASSIGN
+			}
+
+			if op == luau.ADD {
+				op = luau.CCT
+			}
+		}
+	}
+
 	return &luau.BinaryExpr{
 		Left:  left,
 		Right: right,
@@ -231,11 +243,36 @@ func Stmt(s ast.Stmt) (luau.Node, error) {
 		return BlockStmt(stmt)
 	case *ast.ExprStmt:
 		return ExprStmt(stmt)
+	case *ast.IfStmt:
+		return IfStmt(stmt)
 	}
 	return nil, fmt.Errorf("unknown statement: %#v", s)
 }
 
-func AssignStmt(a *ast.AssignStmt) (*luau.AssignStmt, error) {
+func IfStmt(i *ast.IfStmt) (*luau.IfStmt, error) {
+	cond, err := Expr(i.Cond)
+	if err != nil {
+		return nil, err
+	}
+
+	chunk, err := Chunk(i.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	els, err := Stmt(i.Else)
+	if err != nil {
+		return nil, err
+	}
+
+	return &luau.IfStmt{
+		Cond: cond,
+		Body: chunk,
+		Else: els,
+	}, nil
+}
+
+func AssignStmt(a *ast.AssignStmt) (luau.Node, error) {
 	left := make([]luau.Node, len(a.Lhs))
 	for i, v := range a.Lhs {
 		e, err := Expr(v)
@@ -254,6 +291,14 @@ func AssignStmt(a *ast.AssignStmt) (*luau.AssignStmt, error) {
 		}
 
 		right[i] = e
+	}
+
+	if a.Tok == token.DEFINE {
+		return &luau.DeclStmt{
+			Scope:  luau.LOCAL,
+			Names:  left,
+			Values: right,
+		}, nil
 	}
 
 	return &luau.AssignStmt{
