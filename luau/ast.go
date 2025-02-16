@@ -239,12 +239,14 @@ type CallExpr struct {
 
 func (c *CallExpr) Render(w Writer) {
 	c.Fun.Render(w)
+	w.Write("(")
 	for i, a := range c.Args {
 		a.Render(w)
 		if i != len(c.Args)-1 {
 			w.Write(",")
 		}
 	}
+	w.Write(")\n")
 }
 
 // Index expression

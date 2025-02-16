@@ -2,6 +2,7 @@ package transform
 
 import (
 	"errors"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -35,15 +36,22 @@ func Token(t token.Token) luau.Token {
 	return luau.ILLEGAL
 }
 
-func Source(name string, src string) {
+func Source(name string, src string) ([]luau.Node, error) {
 	f, err := Parse(name, src)
 	if err != nil {
 		panic(err)
 	}
 
+	res := []luau.Node{}
 	for _, d := range f.Decls {
-		Decl(d)
+		decl, err := Decl(d)
+		if err != nil {
+			return nil, err
+		}
+
+		res = append(res, decl)
 	}
+	return res, nil
 }
 
 func Parse(name string, src string) (*ast.File, error) {
@@ -55,8 +63,9 @@ func Decl(d ast.Decl) (luau.Node, error) {
 	case *ast.FuncDecl:
 		return FuncDecl(decl)
 	case *ast.GenDecl:
+		return nil, nil
 	}
-	return nil, errors.New("unknown declaration")
+	return nil, fmt.Errorf("unknown declaration: %#v", d)
 }
 
 func FuncDecl(f *ast.FuncDecl) (*luau.FuncStmt, error) {
@@ -83,8 +92,19 @@ func FuncDecl(f *ast.FuncDecl) (*luau.FuncStmt, error) {
 	}, nil
 }
 
-func Ident(i ast.Ident) *luau.Ident {
+func Ident(i *ast.Ident) *luau.Ident {
 	return &luau.Ident{Name: i.Name}
+}
+
+func BasicLit(l *ast.BasicLit) (luau.Node, error) {
+	switch l.Kind {
+	case token.INT, token.FLOAT, token.IMAG:
+		return &luau.NumericLit{Value: l.Value}, nil
+	case token.CHAR, token.STRING:
+		trim := l.Value[1 : len(l.Value)-1]
+		return &luau.StringLit{Value: trim}, nil
+	}
+	return nil, fmt.Errorf("unknown literal: %#v", l)
 }
 
 func Chunk(b *ast.BlockStmt) (*luau.Chunk, error) {
@@ -114,9 +134,15 @@ func Expr(e ast.Expr) (luau.Node, error) {
 	case *ast.IndexExpr:
 		return IndexExpr(expr)
 	case *ast.ParenExpr:
-
+		return ParenExpr(expr)
+	case *ast.SelectorExpr:
+		return SelectorExpr(expr)
+	case *ast.BasicLit:
+		return BasicLit(expr)
+	case *ast.Ident:
+		return Ident(expr), nil
 	}
-	return nil, errors.New("unknown expression")
+	return nil, fmt.Errorf("unknown expression: %#v", e)
 }
 
 func BinaryExpr(e *ast.BinaryExpr) (*luau.BinaryExpr, error) {
@@ -154,7 +180,8 @@ func CallExpr(c *ast.CallExpr) (*luau.CallExpr, error) {
 	}
 
 	return &luau.CallExpr{
-		Fun: f,
+		Fun:  f,
+		Args: args,
 	}, nil
 }
 func IndexExpr(i *ast.IndexExpr) (*luau.IndexExpr, error) {
@@ -183,14 +210,29 @@ func ParenExpr(p *ast.ParenExpr) (*luau.ParenExpr, error) {
 	}, nil
 }
 
+func SelectorExpr(s *ast.SelectorExpr) (*luau.SelectorExpr, error) {
+	sel := Ident(s.Sel)
+	x, err := Expr(s.X)
+	if err != nil {
+		return nil, err
+	}
+
+	return &luau.SelectorExpr{
+		Sel: sel,
+		X:   x,
+	}, nil
+}
+
 func Stmt(s ast.Stmt) (luau.Node, error) {
 	switch stmt := s.(type) {
 	case *ast.AssignStmt:
 		return AssignStmt(stmt)
 	case *ast.BlockStmt:
 		return BlockStmt(stmt)
+	case *ast.ExprStmt:
+		return ExprStmt(stmt)
 	}
-	return nil, errors.New("unknown statement")
+	return nil, fmt.Errorf("unknown statement: %#v", s)
 }
 
 func AssignStmt(a *ast.AssignStmt) (*luau.AssignStmt, error) {
@@ -227,5 +269,15 @@ func BlockStmt(b *ast.BlockStmt) (*luau.DoStmt, error) {
 	}
 	return &luau.DoStmt{
 		Chunk: c,
+	}, nil
+}
+
+func ExprStmt(e *ast.ExprStmt) (*luau.ExprStmt, error) {
+	expr, err := Expr(e.X)
+	if err != nil {
+		return nil, err
+	}
+	return &luau.ExprStmt{
+		X: expr,
 	}, nil
 }
