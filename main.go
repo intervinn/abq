@@ -13,7 +13,7 @@ func main() {
 		Params: []*luau.Ident{
 			{Name: "x"},
 		},
-		Block: &luau.Block{
+		Chunk: &luau.Chunk{
 			List: []luau.Node{
 				&luau.DeclStmt{
 					Scope: luau.LOCAL,

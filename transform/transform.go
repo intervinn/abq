@@ -9,31 +9,57 @@ import (
 	"github.com/intervinn/abq/luau"
 )
 
-func parse(name string, src string) (*ast.File, error) {
-	return parser.ParseFile(token.NewFileSet(), name, src, parser.AllErrors)
+func Token(t token.Token) luau.Token {
+	switch t {
+	case token.ADD:
+		return luau.ADD
+	case token.ADD_ASSIGN:
+		return luau.ADD_ASSIGN
+	case token.SUB:
+		return luau.SUB
+	case token.SUB_ASSIGN:
+		return luau.SUB_ASSIGN
+	case token.MUL:
+		return luau.MUL
+	case token.MUL_ASSIGN:
+		return luau.MUL_ASSIGN
+	case token.QUO:
+		return luau.DIV
+	case token.QUO_ASSIGN:
+		return luau.DIV_ASSIGN
+	case token.REM:
+		return luau.REM
+	case token.REM_ASSIGN:
+		return luau.REM_ASSIGN
+	}
+	return luau.ILLEGAL
 }
 
 func Source(name string, src string) {
-	f, err := parse(name, src)
+	f, err := Parse(name, src)
 	if err != nil {
 		panic(err)
 	}
 
 	for _, d := range f.Decls {
-		decl(d)
+		Decl(d)
 	}
 }
 
-func decl(decl ast.Decl) (luau.Node, error) {
-	switch d := decl.(type) {
+func Parse(name string, src string) (*ast.File, error) {
+	return parser.ParseFile(token.NewFileSet(), name, src, parser.AllErrors)
+}
+
+func Decl(d ast.Decl) (luau.Node, error) {
+	switch decl := d.(type) {
 	case *ast.FuncDecl:
-		return fdecl(d), nil
-	default:
-		return nil, errors.New("unknown declaration")
+		return FuncDecl(decl)
+	case *ast.GenDecl:
 	}
+	return nil, errors.New("unknown declaration")
 }
 
-func fdecl(f *ast.FuncDecl) *luau.FuncStmt {
+func FuncDecl(f *ast.FuncDecl) (*luau.FuncStmt, error) {
 	plist := f.Type.Params.List
 	params := []*luau.Ident{}
 	for _, ls := range plist {
@@ -42,22 +68,164 @@ func fdecl(f *ast.FuncDecl) *luau.FuncStmt {
 		}
 	}
 
+	c, err := Chunk(f.Body)
+	if err != nil {
+		return nil, err
+	}
+
 	return &luau.FuncStmt{
 		Name: &luau.Ident{
 			Name: f.Name.Name,
 		},
 		Params: params,
-		Block:  block(f.Body),
+		Chunk:  c,
 		Scope:  luau.GLOBAL,
+	}, nil
+}
+
+func Ident(i ast.Ident) *luau.Ident {
+	return &luau.Ident{Name: i.Name}
+}
+
+func Chunk(b *ast.BlockStmt) (*luau.Chunk, error) {
+	ls := b.List
+	result := make([]luau.Node, len(ls))
+	for i, v := range ls {
+		s, err := Stmt(v)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = s
 	}
+
+	return &luau.Chunk{
+		List: result,
+	}, nil
 }
 
-func block(b *ast.BlockStmt) *luau.Block {
-	return nil
+func Expr(e ast.Expr) (luau.Node, error) {
+	switch expr := e.(type) {
+	case *ast.BadExpr:
+		return nil, errors.New("bad expression")
+	case *ast.BinaryExpr:
+		return BinaryExpr(expr)
+	case *ast.CallExpr:
+		return CallExpr(expr)
+	case *ast.IndexExpr:
+		return IndexExpr(expr)
+	case *ast.ParenExpr:
+
+	}
+	return nil, errors.New("unknown expression")
 }
 
-/*
-func stmt(s *ast.Stmt) {
+func BinaryExpr(e *ast.BinaryExpr) (*luau.BinaryExpr, error) {
+	op := Token(e.Op)
+	left, err := Expr(e.X)
+	if err != nil {
+		return nil, err
+	}
 
+	right, err := Expr(e.Y)
+	if err != nil {
+		return nil, err
+	}
+
+	return &luau.BinaryExpr{
+		Left:  left,
+		Right: right,
+		Op:    op,
+	}, nil
 }
-*/
+
+func CallExpr(c *ast.CallExpr) (*luau.CallExpr, error) {
+	f, err := Expr(c.Fun)
+	if err != nil {
+		return nil, err
+	}
+
+	args := make([]luau.Node, len(c.Args))
+	for i, v := range c.Args {
+		e, err := Expr(v)
+		if err != nil {
+			return nil, err
+		}
+		args[i] = e
+	}
+
+	return &luau.CallExpr{
+		Fun: f,
+	}, nil
+}
+func IndexExpr(i *ast.IndexExpr) (*luau.IndexExpr, error) {
+	x, err := Expr(i.X)
+	if err != nil {
+		return nil, err
+	}
+
+	index, err := Expr(i.Index)
+	if err != nil {
+		return nil, err
+	}
+
+	return &luau.IndexExpr{
+		Index: index,
+		X:     x,
+	}, nil
+}
+func ParenExpr(p *ast.ParenExpr) (*luau.ParenExpr, error) {
+	x, err := Expr(p.X)
+	if err != nil {
+		return nil, err
+	}
+	return &luau.ParenExpr{
+		X: x,
+	}, nil
+}
+
+func Stmt(s ast.Stmt) (luau.Node, error) {
+	switch stmt := s.(type) {
+	case *ast.AssignStmt:
+		return AssignStmt(stmt)
+	case *ast.BlockStmt:
+		return BlockStmt(stmt)
+	}
+	return nil, errors.New("unknown statement")
+}
+
+func AssignStmt(a *ast.AssignStmt) (*luau.AssignStmt, error) {
+	left := make([]luau.Node, len(a.Lhs))
+	for i, v := range a.Lhs {
+		e, err := Expr(v)
+		if err != nil {
+			return nil, err
+		}
+
+		left[i] = e
+	}
+
+	right := make([]luau.Node, len(a.Rhs))
+	for i, v := range a.Rhs {
+		e, err := Expr(v)
+		if err != nil {
+			return nil, err
+		}
+
+		right[i] = e
+	}
+
+	return &luau.AssignStmt{
+		Left:  left,
+		Right: right,
+	}, nil
+}
+
+func BlockStmt(b *ast.BlockStmt) (*luau.DoStmt, error) {
+	c, err := Chunk(b)
+	if err != nil {
+		return nil, err
+	}
+	return &luau.DoStmt{
+		Chunk: c,
+	}, nil
+}

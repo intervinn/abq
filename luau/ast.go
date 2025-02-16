@@ -1,16 +1,28 @@
 package luau
 
-// Block is a basic container of nodes
+// Chunk is a basic container of nodes with indentation considered
+type Chunk struct {
+	List []Node
+}
+
+func (b *Chunk) Render(w Writer) {
+	w.IncIndent()
+	for _, n := range b.List {
+		n.Render(w)
+	}
+	w.DecIndent()
+}
+
+// Block is meant for internal use, whenever one node should be transformed into multiple
+
 type Block struct {
 	List []Node
 }
 
 func (c *Block) Render(w Writer) {
-	w.IncIndent()
 	for _, n := range c.List {
 		n.Render(w)
 	}
-	w.DecIndent()
 }
 
 // Identifier
@@ -22,23 +34,23 @@ func (i *Ident) Render(w Writer) {
 	w.Write(i.Name)
 }
 
-// Do-end block
+// Do-end Chunk
 // ex: do print("hi") end
 type DoStmt struct {
-	Block *Block
+	Chunk *Chunk
 }
 
 func (d *DoStmt) Render(w Writer) {
 	w.Pre("do\n")
-	d.Block.Render(w)
+	d.Chunk.Render(w)
 	w.Pre("end\n")
 }
 
-// While block
+// While Chunk
 // ex: while true do print("hi") end
 type WhileStmt struct {
 	Exp   Node
-	Block *Block
+	Chunk *Chunk
 }
 
 func (wh *WhileStmt) Render(w Writer) {
@@ -46,15 +58,15 @@ func (wh *WhileStmt) Render(w Writer) {
 	wh.Exp.Render(w)
 	w.Write("do\n")
 
-	wh.Block.Render(w)
+	wh.Chunk.Render(w)
 	w.Pre("end\n")
 }
 
-// For block
+// For Chunk
 // ex: for i = 1,10,1 do end
 // ex: for i,v in pairs({1,2,3}) do end
 type ForStmt struct {
-	Block *Block
+	Chunk *Chunk
 	Exp   Node
 }
 
@@ -148,7 +160,7 @@ func (r *ReturnStmt) Render(w Writer) {
 type FuncStmt struct {
 	Name   *Ident
 	Params []*Ident
-	Block  *Block
+	Chunk  *Chunk
 	Scope  Scope
 }
 
@@ -170,7 +182,7 @@ func (f *FuncStmt) Render(w Writer) {
 	}
 	w.Write(")\n")
 
-	f.Block.Render(w)
+	f.Chunk.Render(w)
 	w.Write("end\n")
 }
 
@@ -179,7 +191,7 @@ func (f *FuncStmt) Render(w Writer) {
 type FuncLit struct {
 	Name   *Ident
 	Params []*Ident
-	Block  *Block
+	Chunk  *Chunk
 }
 
 func (f *FuncLit) Render(w Writer) {
@@ -194,7 +206,7 @@ func (f *FuncLit) Render(w Writer) {
 	}
 	w.Write(")\n")
 
-	f.Block.Render(w)
+	f.Chunk.Render(w)
 	w.Write("end\n")
 }
 
@@ -222,7 +234,7 @@ func (s *StringLit) Render(w Writer) {
 // ex: foo()
 type CallExpr struct {
 	Args []Node
-	Fun  Ident
+	Fun  Node
 }
 
 func (c *CallExpr) Render(w Writer) {
