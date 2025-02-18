@@ -91,16 +91,50 @@ func (wh *WhileStmt) Render(w Writer) {
 	w.Pre("end\n")
 }
 
-// For Chunk
+// Numeric For Statement
 // ex: for i = 1,10,1 do end
-// ex: for i,v in pairs({1,2,3}) do end
-type ForStmt struct {
+type NumericForStmt struct {
 	Chunk *Chunk
-	Exp   Node
+	Init  Node
+	Cond  Node
+	End   Node
 }
 
-func (f *ForStmt) Render(w Writer) {
+func (n *NumericForStmt) Render(w Writer) {
+	w.Pre("for ")
+	n.Init.Render(w)
+	w.Write(",")
+	n.Cond.Render(w)
+	w.Write(",")
+	n.End.Render(w)
+	w.Write(" do\n")
 
+	n.Chunk.Render(w)
+	w.Pre("end\n")
+}
+
+// Generic for statement
+// ex: for i,v in pairs({1,2,3}) do end
+type GenericForStmt struct {
+	Chunk  *Chunk
+	Idents []*Ident
+	Iter   Node // iterator, ex: pairs({1,2,3})
+}
+
+func (g *GenericForStmt) Render(w Writer) {
+	w.Pre("for ")
+	for i, v := range g.Idents {
+		v.Render(w)
+		if i != len(g.Idents)-1 {
+			w.Write(",")
+		}
+	}
+
+	w.Write(" in ")
+	g.Iter.Render(w)
+	w.Write(" do\n")
+	g.Chunk.Render(w)
+	w.Pre("end")
 }
 
 // Var declaration
@@ -259,6 +293,48 @@ func (s *StringLit) Render(w Writer) {
 	w.Write("\"" + s.Value + "\"")
 }
 
+// Table literal
+// ex: {a = 5}
+type TableLit struct {
+	Elts []Node
+}
+
+// check if theres a key-value expr
+func haskv(t *TableLit) bool {
+	for _, v := range t.Elts {
+		if _, ok := v.(*KeyValueExpr); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func (t *TableLit) Render(w Writer) {
+	w.Write("{")
+	if haskv(t) {
+		w.Write("\n")
+		w.IncIndent()
+		for i, e := range t.Elts {
+			w.Pre("")
+			e.Render(w)
+			if i != len(t.Elts)-1 {
+				w.Write(",")
+			}
+			w.Write("\n")
+		}
+		w.DecIndent()
+		w.Pre("}")
+	} else {
+		for i, e := range t.Elts {
+			e.Render(w)
+			if i != len(t.Elts)-1 {
+				w.Write(", ")
+			}
+		}
+		w.Write("}")
+	}
+}
+
 // Call expression
 // ex: foo()
 type CallExpr struct {
@@ -275,7 +351,7 @@ func (c *CallExpr) Render(w Writer) {
 			w.Write(",")
 		}
 	}
-	w.Write(")\n")
+	w.Write(")")
 }
 
 // Index expression
@@ -289,7 +365,7 @@ func (i *IndexExpr) Render(w Writer) {
 	i.X.Render(w)
 	w.Write("[")
 	i.Index.Render(w)
-	w.Write("]\n")
+	w.Write("]")
 }
 
 // Selector expression
@@ -329,4 +405,24 @@ func (p *ParenExpr) Render(w Writer) {
 	w.Write("(")
 	p.X.Render(w)
 	w.Write(")")
+}
+
+// Key value expression
+// ex: ["foo"] = 5
+type KeyValueExpr struct {
+	Key   Node
+	Value Node
+}
+
+func (k *KeyValueExpr) Render(w Writer) {
+	if ident, ok := k.Key.(*Ident); ok {
+		ident.Render(w)
+	} else {
+		w.Write("[")
+		k.Key.Render(w)
+		w.Write("]")
+	}
+
+	w.Write(" = ")
+	k.Value.Render(w)
 }
