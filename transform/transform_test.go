@@ -113,3 +113,26 @@ func TestStructs(t *testing.T) {
 		fmt.Println(w.Content)
 	}
 }
+
+func TestMod(t *testing.T) {
+	text := `
+	package main
+
+	func main() {
+		transform.Mod("print('aaa')")
+		x := 10
+		transform.Mod("assert(x == 10, 'what')")
+	}
+	`
+
+	src, err := Source("main.go", text)
+	if err != nil {
+		t.Error(err)
+	}
+
+	for _, s := range src {
+		w := luau.NewStringWriter()
+		s.Render(w)
+		fmt.Println(w.Content)
+	}
+}

@@ -10,6 +10,10 @@ import (
 	"github.com/intervinn/abq/luau"
 )
 
+// transform.Mod is a reserved call expression
+// for rendering raw luau strings in where its written
+func Mod(value string) {}
+
 func Token(t token.Token) luau.Token {
 	switch t {
 	case token.ADD:
@@ -171,7 +175,7 @@ func Ident(i *ast.Ident, f *ast.File) *luau.Ident {
 	return &luau.Ident{Name: i.Name}
 }
 
-func BasicLit(l *ast.BasicLit, f *ast.File) (luau.Node, error) {
+func BasicLit(l *ast.BasicLit) (luau.Node, error) {
 	switch l.Kind {
 	case token.INT, token.FLOAT, token.IMAG:
 		return &luau.NumericLit{Value: l.Value}, nil
@@ -234,7 +238,7 @@ func Expr(e ast.Expr, f *ast.File) (luau.Node, error) {
 	case *ast.SelectorExpr:
 		return SelectorExpr(expr, f)
 	case *ast.BasicLit:
-		return BasicLit(expr, f)
+		return BasicLit(expr)
 	case *ast.Ident:
 		return Ident(expr, f), nil
 	case *ast.KeyValueExpr:
@@ -318,7 +322,7 @@ func KeyValueExpr(k *ast.KeyValueExpr, f *ast.File) (*luau.KeyValueExpr, error) 
 	}, nil
 }
 
-func CallExpr(c *ast.CallExpr, f *ast.File) (*luau.CallExpr, error) {
+func CallExpr(c *ast.CallExpr, f *ast.File) (luau.Node, error) {
 	fn, err := Expr(c.Fun, f)
 	if err != nil {
 		return nil, err
@@ -328,6 +332,24 @@ func CallExpr(c *ast.CallExpr, f *ast.File) (*luau.CallExpr, error) {
 
 	// check if its a struct method
 	if sl, ok := c.Fun.(*ast.SelectorExpr); ok {
+
+		// check if its transform.Mod
+		if id, ok := sl.X.(*ast.Ident); ok && id.Name == "transform" && sl.Sel.Name == "Mod" {
+			ermsg := errors.New("transform.Mod must have exactly one string argument")
+			if len(c.Args) != 1 {
+				return nil, ermsg
+			}
+			if blit, ok := c.Args[0].(*ast.BasicLit); ok {
+				if blit.Kind != token.STRING {
+					return nil, ermsg
+				}
+				return &luau.Raw{
+					Content: blit.Value[1 : len(blit.Value)-1],
+				}, nil
+			}
+		}
+
+		// if method has an object, add self arg
 		if id, ok := sl.X.(*ast.Ident); ok && id.Obj != nil {
 			args = append(args, Ident(id, f))
 		}

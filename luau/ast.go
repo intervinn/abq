@@ -1,5 +1,14 @@
 package luau
 
+// Raw renderable string
+type Raw struct {
+	Content string
+}
+
+func (r *Raw) Render(w Writer) {
+	w.Write(r.Content)
+}
+
 // Chunk is a basic container of nodes with indentation considered
 type Chunk struct {
 	List []Node
