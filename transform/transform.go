@@ -14,6 +14,13 @@ import (
 // for rendering raw luau strings in where its written
 func Mod(value string) {}
 
+// transform.Require is reserved
+// for making sure a certain compiled package is imported.
+// It should be used as a top-level declaration
+func Require(value string) any {
+	return nil
+}
+
 func Token(t token.Token) luau.Token {
 	switch t {
 	case token.ADD:
