@@ -86,6 +86,9 @@ func TestStructs(t *testing.T) {
 		Name string
 	}
 
+	func (e *Entity) Foo() {
+	}
+
 	func NewEntity() *Entity {
 		return &Entity{
 			Name: "bob",
@@ -95,6 +98,7 @@ func TestStructs(t *testing.T) {
 	func main() {
 		e := NewEntity()
 		fmt.Println(e.Name)
+		e.Foo()
 	}
 	`
 

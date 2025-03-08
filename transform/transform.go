@@ -44,7 +44,7 @@ func Source(name string, src string) ([]luau.Node, error) {
 
 	res := []luau.Node{}
 	for _, d := range f.Decls {
-		decl, err := Decl(d)
+		decl, err := Decl(d, f)
 		if err != nil {
 			return nil, err
 		}
@@ -58,21 +58,21 @@ func Parse(name string, src string) (*ast.File, error) {
 	return parser.ParseFile(token.NewFileSet(), name, src, parser.AllErrors)
 }
 
-func Decl(d ast.Decl) (luau.Node, error) {
+func Decl(d ast.Decl, f *ast.File) (luau.Node, error) {
 	switch decl := d.(type) {
 	case *ast.FuncDecl:
-		return FuncDecl(decl)
+		return FuncDecl(decl, f)
 	case *ast.GenDecl:
-		return GenDecl(decl)
+		return GenDecl(decl, f)
 	}
 	return nil, fmt.Errorf("unknown declaration: %#v", d)
 }
 
-func GenDecl(g *ast.GenDecl) (luau.Node, error) {
+func GenDecl(g *ast.GenDecl, f *ast.File) (luau.Node, error) {
 	block := &luau.Block{}
 
 	for _, s := range g.Specs {
-		spec, err := Spec(s)
+		spec, err := Spec(s, f)
 		if err != nil {
 			return nil, err
 		}
@@ -82,25 +82,25 @@ func GenDecl(g *ast.GenDecl) (luau.Node, error) {
 	return block, nil
 }
 
-func Spec(s ast.Spec) (luau.Node, error) {
+func Spec(s ast.Spec, f *ast.File) (luau.Node, error) {
 	switch spec := s.(type) {
 	case *ast.ValueSpec:
-		return ValueSpec(spec)
+		return ValueSpec(spec, f)
 	case *ast.TypeSpec:
-		return TypeSpec(spec)
+		return TypeSpec(spec, f)
 	}
 	return nil, fmt.Errorf("unknown spec: %#v", s)
 }
 
-func ValueSpec(v *ast.ValueSpec) (*luau.DeclStmt, error) {
+func ValueSpec(v *ast.ValueSpec, f *ast.File) (*luau.DeclStmt, error) {
 	names := make([]luau.Node, len(v.Names))
 	for i, v := range v.Names {
-		names[i] = Ident(v)
+		names[i] = Ident(v, f)
 	}
 
 	values := make([]luau.Node, len(v.Values))
 	for i, v := range v.Values {
-		e, err := Expr(v)
+		e, err := Expr(v, f)
 		if err != nil {
 			return nil, err
 		}
@@ -115,8 +115,8 @@ func ValueSpec(v *ast.ValueSpec) (*luau.DeclStmt, error) {
 	}, nil
 }
 
-func TypeSpec(t *ast.TypeSpec) (*luau.DeclStmt, error) {
-	i := Ident(t.Name)
+func TypeSpec(t *ast.TypeSpec, f *ast.File) (*luau.DeclStmt, error) {
+	i := Ident(t.Name, f)
 	return &luau.DeclStmt{
 		Scope:  luau.LOCAL,
 		Names:  []luau.Node{i},
@@ -124,7 +124,7 @@ func TypeSpec(t *ast.TypeSpec) (*luau.DeclStmt, error) {
 	}, nil
 }
 
-func FuncDecl(f *ast.FuncDecl) (*luau.FuncStmt, error) {
+func FuncDecl(f *ast.FuncDecl, file *ast.File) (*luau.FuncStmt, error) {
 	plist := f.Type.Params.List
 	params := []*luau.Ident{}
 	for _, ls := range plist {
@@ -133,7 +133,7 @@ func FuncDecl(f *ast.FuncDecl) (*luau.FuncStmt, error) {
 		}
 	}
 
-	c, err := Chunk(f.Body)
+	c, err := Chunk(f.Body, file)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func FuncDecl(f *ast.FuncDecl) (*luau.FuncStmt, error) {
 
 	if f.Recv != nil {
 		r := f.Recv.List[0]
-		i := Ident(r.Names[0])
+		i := Ident(r.Names[0], file)
 
 		params = append([]*luau.Ident{i}, params...)
 		rtype, ok := r.Type.(*ast.StarExpr)
@@ -167,11 +167,11 @@ func FuncDecl(f *ast.FuncDecl) (*luau.FuncStmt, error) {
 	}, nil
 }
 
-func Ident(i *ast.Ident) *luau.Ident {
+func Ident(i *ast.Ident, f *ast.File) *luau.Ident {
 	return &luau.Ident{Name: i.Name}
 }
 
-func BasicLit(l *ast.BasicLit) (luau.Node, error) {
+func BasicLit(l *ast.BasicLit, f *ast.File) (luau.Node, error) {
 	switch l.Kind {
 	case token.INT, token.FLOAT, token.IMAG:
 		return &luau.NumericLit{Value: l.Value}, nil
@@ -182,12 +182,12 @@ func BasicLit(l *ast.BasicLit) (luau.Node, error) {
 	return nil, fmt.Errorf("unknown literal: %#v", l)
 }
 
-func CompositeLit(l *ast.CompositeLit) (luau.Node, error) {
+func CompositeLit(l *ast.CompositeLit, f *ast.File) (luau.Node, error) {
 	switch l.Type.(type) {
 	case *ast.ArrayType, *ast.MapType, *ast.Ident:
 		elts := make([]luau.Node, len(l.Elts))
 		for i, v := range l.Elts {
-			e, err := Expr(v)
+			e, err := Expr(v, f)
 			if err != nil {
 				return nil, err
 			}
@@ -203,11 +203,11 @@ func CompositeLit(l *ast.CompositeLit) (luau.Node, error) {
 	return nil, fmt.Errorf("unknown composite literal: %#v", l)
 }
 
-func Chunk(b *ast.BlockStmt) (*luau.Chunk, error) {
+func Chunk(b *ast.BlockStmt, f *ast.File) (*luau.Chunk, error) {
 	ls := b.List
 	result := make([]luau.Node, len(ls))
 	for i, v := range ls {
-		s, err := Stmt(v)
+		s, err := Stmt(v, f)
 		if err != nil {
 			return nil, err
 		}
@@ -219,40 +219,41 @@ func Chunk(b *ast.BlockStmt) (*luau.Chunk, error) {
 	}, nil
 }
 
-func Expr(e ast.Expr) (luau.Node, error) {
+func Expr(e ast.Expr, f *ast.File) (luau.Node, error) {
 	switch expr := e.(type) {
 	case *ast.BadExpr:
 		return nil, errors.New("bad expression")
 	case *ast.BinaryExpr:
-		return BinaryExpr(expr)
+		return BinaryExpr(expr, f)
 	case *ast.CallExpr:
-		return CallExpr(expr)
+		return CallExpr(expr, f)
 	case *ast.IndexExpr:
-		return IndexExpr(expr)
+		return IndexExpr(expr, f)
 	case *ast.ParenExpr:
-		return ParenExpr(expr)
+		return ParenExpr(expr, f)
 	case *ast.SelectorExpr:
-		return SelectorExpr(expr)
+		return SelectorExpr(expr, f)
 	case *ast.BasicLit:
-		return BasicLit(expr)
+		return BasicLit(expr, f)
 	case *ast.Ident:
-		return Ident(expr), nil
+		return Ident(expr, f), nil
 	case *ast.KeyValueExpr:
-		return KeyValueExpr(expr)
+		return KeyValueExpr(expr, f)
 	case *ast.CompositeLit:
-		return CompositeLit(expr)
+		return CompositeLit(expr, f)
 	case *ast.UnaryExpr:
-		return UnaryExpr(expr)
+		return UnaryExpr(expr, f)
 	}
 	return nil, fmt.Errorf("unknown expression: %#v", e)
 }
 
-func UnaryExpr(u *ast.UnaryExpr) (luau.Node, error) {
-	x, err := Expr(u.X)
+func UnaryExpr(u *ast.UnaryExpr, f *ast.File) (luau.Node, error) {
+	x, err := Expr(u.X, f)
 	if err != nil {
 		return nil, err
 	}
 
+	// if constructing a struct
 	if _, ok := u.X.(*ast.CompositeLit); ok && u.Op == token.AND {
 		return &luau.CallExpr{
 			Fun: &luau.Ident{
@@ -270,14 +271,14 @@ func UnaryExpr(u *ast.UnaryExpr) (luau.Node, error) {
 	return x, nil
 }
 
-func BinaryExpr(e *ast.BinaryExpr) (*luau.BinaryExpr, error) {
+func BinaryExpr(e *ast.BinaryExpr, f *ast.File) (*luau.BinaryExpr, error) {
 	op := Token(e.Op)
-	left, err := Expr(e.X)
+	left, err := Expr(e.X, f)
 	if err != nil {
 		return nil, err
 	}
 
-	right, err := Expr(e.Y)
+	right, err := Expr(e.Y, f)
 	if err != nil {
 		return nil, err
 	}
@@ -301,12 +302,12 @@ func BinaryExpr(e *ast.BinaryExpr) (*luau.BinaryExpr, error) {
 	}, nil
 }
 
-func KeyValueExpr(k *ast.KeyValueExpr) (*luau.KeyValueExpr, error) {
-	key, err := Expr(k.Key)
+func KeyValueExpr(k *ast.KeyValueExpr, f *ast.File) (*luau.KeyValueExpr, error) {
+	key, err := Expr(k.Key, f)
 	if err != nil {
 		return nil, err
 	}
-	value, err := Expr(k.Value)
+	value, err := Expr(k.Value, f)
 	if err != nil {
 		return nil, err
 	}
@@ -317,33 +318,41 @@ func KeyValueExpr(k *ast.KeyValueExpr) (*luau.KeyValueExpr, error) {
 	}, nil
 }
 
-func CallExpr(c *ast.CallExpr) (*luau.CallExpr, error) {
-	f, err := Expr(c.Fun)
+func CallExpr(c *ast.CallExpr, f *ast.File) (*luau.CallExpr, error) {
+	fn, err := Expr(c.Fun, f)
 	if err != nil {
 		return nil, err
 	}
 
-	args := make([]luau.Node, len(c.Args))
-	for i, v := range c.Args {
-		e, err := Expr(v)
+	args := []luau.Node{}
+
+	// check if its a struct method
+	if sl, ok := c.Fun.(*ast.SelectorExpr); ok {
+		if id, ok := sl.X.(*ast.Ident); ok && id.Obj != nil {
+			args = append(args, Ident(id, f))
+		}
+	}
+
+	for _, v := range c.Args {
+		e, err := Expr(v, f)
 		if err != nil {
 			return nil, err
 		}
-		args[i] = e
+		args = append(args, e)
 	}
 
 	return &luau.CallExpr{
-		Fun:  f,
+		Fun:  fn,
 		Args: args,
 	}, nil
 }
-func IndexExpr(i *ast.IndexExpr) (*luau.IndexExpr, error) {
-	x, err := Expr(i.X)
+func IndexExpr(i *ast.IndexExpr, f *ast.File) (*luau.IndexExpr, error) {
+	x, err := Expr(i.X, f)
 	if err != nil {
 		return nil, err
 	}
 
-	index, err := Expr(i.Index)
+	index, err := Expr(i.Index, f)
 	if err != nil {
 		return nil, err
 	}
@@ -353,8 +362,8 @@ func IndexExpr(i *ast.IndexExpr) (*luau.IndexExpr, error) {
 		X:     x,
 	}, nil
 }
-func ParenExpr(p *ast.ParenExpr) (*luau.ParenExpr, error) {
-	x, err := Expr(p.X)
+func ParenExpr(p *ast.ParenExpr, f *ast.File) (*luau.ParenExpr, error) {
+	x, err := Expr(p.X, f)
 	if err != nil {
 		return nil, err
 	}
@@ -363,9 +372,9 @@ func ParenExpr(p *ast.ParenExpr) (*luau.ParenExpr, error) {
 	}, nil
 }
 
-func SelectorExpr(s *ast.SelectorExpr) (*luau.SelectorExpr, error) {
-	sel := Ident(s.Sel)
-	x, err := Expr(s.X)
+func SelectorExpr(s *ast.SelectorExpr, f *ast.File) (*luau.SelectorExpr, error) {
+	sel := Ident(s.Sel, f)
+	x, err := Expr(s.X, f)
 	if err != nil {
 		return nil, err
 	}
@@ -376,34 +385,34 @@ func SelectorExpr(s *ast.SelectorExpr) (*luau.SelectorExpr, error) {
 	}, nil
 }
 
-func Stmt(s ast.Stmt) (luau.Node, error) {
+func Stmt(s ast.Stmt, f *ast.File) (luau.Node, error) {
 	switch stmt := s.(type) {
 	case *ast.AssignStmt:
-		return AssignStmt(stmt)
+		return AssignStmt(stmt, f)
 	case *ast.BlockStmt:
-		return BlockStmt(stmt)
+		return BlockStmt(stmt, f)
 	case *ast.ExprStmt:
-		return ExprStmt(stmt)
+		return ExprStmt(stmt, f)
 	case *ast.IfStmt:
-		return IfStmt(stmt)
+		return IfStmt(stmt, f)
 	case *ast.ReturnStmt:
-		return ReturnStmt(stmt)
+		return ReturnStmt(stmt, f)
 	}
 	return nil, fmt.Errorf("unknown statement: %#v", s)
 }
 
-func IfStmt(i *ast.IfStmt) (*luau.IfStmt, error) {
-	cond, err := Expr(i.Cond)
+func IfStmt(i *ast.IfStmt, f *ast.File) (*luau.IfStmt, error) {
+	cond, err := Expr(i.Cond, f)
 	if err != nil {
 		return nil, err
 	}
 
-	chunk, err := Chunk(i.Body)
+	chunk, err := Chunk(i.Body, f)
 	if err != nil {
 		return nil, err
 	}
 
-	els, err := Stmt(i.Else)
+	els, err := Stmt(i.Else, f)
 	if err != nil {
 		return nil, err
 	}
@@ -415,10 +424,10 @@ func IfStmt(i *ast.IfStmt) (*luau.IfStmt, error) {
 	}, nil
 }
 
-func AssignStmt(a *ast.AssignStmt) (luau.Node, error) {
+func AssignStmt(a *ast.AssignStmt, f *ast.File) (luau.Node, error) {
 	left := make([]luau.Node, len(a.Lhs))
 	for i, v := range a.Lhs {
-		e, err := Expr(v)
+		e, err := Expr(v, f)
 		if err != nil {
 			return nil, err
 		}
@@ -428,7 +437,7 @@ func AssignStmt(a *ast.AssignStmt) (luau.Node, error) {
 
 	right := make([]luau.Node, len(a.Rhs))
 	for i, v := range a.Rhs {
-		e, err := Expr(v)
+		e, err := Expr(v, f)
 		if err != nil {
 			return nil, err
 		}
@@ -450,8 +459,8 @@ func AssignStmt(a *ast.AssignStmt) (luau.Node, error) {
 	}, nil
 }
 
-func BlockStmt(b *ast.BlockStmt) (*luau.DoStmt, error) {
-	c, err := Chunk(b)
+func BlockStmt(b *ast.BlockStmt, f *ast.File) (*luau.DoStmt, error) {
+	c, err := Chunk(b, f)
 	if err != nil {
 		return nil, err
 	}
@@ -460,8 +469,8 @@ func BlockStmt(b *ast.BlockStmt) (*luau.DoStmt, error) {
 	}, nil
 }
 
-func ExprStmt(e *ast.ExprStmt) (*luau.ExprStmt, error) {
-	expr, err := Expr(e.X)
+func ExprStmt(e *ast.ExprStmt, f *ast.File) (*luau.ExprStmt, error) {
+	expr, err := Expr(e.X, f)
 	if err != nil {
 		return nil, err
 	}
@@ -470,10 +479,10 @@ func ExprStmt(e *ast.ExprStmt) (*luau.ExprStmt, error) {
 	}, nil
 }
 
-func ReturnStmt(r *ast.ReturnStmt) (*luau.ReturnStmt, error) {
+func ReturnStmt(r *ast.ReturnStmt, f *ast.File) (*luau.ReturnStmt, error) {
 	res := make([]luau.Node, len(r.Results))
 	for i, v := range r.Results {
-		e, err := Expr(v)
+		e, err := Expr(v, f)
 		if err != nil {
 			return nil, err
 		}
