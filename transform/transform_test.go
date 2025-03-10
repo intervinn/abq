@@ -123,11 +123,11 @@ func TestMod(t *testing.T) {
 		type Logger struct {}
 
 		func NewLogger() *Logger {
-		return transform.Mod("logger.new()")
+			return transform.Mod("logger.new()")
 		}
 
 		func (l *Logger) Log(msg string) {
-		transform.Mod("logger.log(l, msg)")
+			transform.Mod("logger.log(l, msg)")
 		}
 	`
 

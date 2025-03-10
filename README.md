@@ -14,11 +14,45 @@ There are some limitations ABQ will aim to implement:
 * Every individual package is to be compiled and packed in a single file.
 
 ## Modding
-ABQ placeholds one call expression - `transform.Mod`. It's string parameter 
+One call expression will allow pasting any luau string which allows you to port existent Luau code to Go,
+and it is `transform.Mod()`:
+
+```go
+		package main
+
+		var _ = transform.Mod("local logger = require('logger')")
+
+		type Logger struct {}
+
+		func NewLogger() *Logger {
+			return transform.Mod("logger.new()")
+		}
+
+		func (l *Logger) Log(msg string) {
+			transform.Mod("logger.log(l, msg)")
+		}
+```
+
+Will turn into the following:
+
+```luau
+local logger = require('logger')
+local Logger = {}
+
+function NewLogger()
+        return logger.new()
+end
+
+function Logger.Log(l,msg)
+        logger.log(l, msg)
+end
+```
 
 ## Projects
-`transform` - Go AST to Luau AST transformer
-`luau` - Luau AST, writer and other essentials
+* `transform` - Go AST to Luau AST transformer
+* `luau` - Luau AST, writer and other essentials
+* `transform/pack` - Packaging and working with FS
+* `cmd/abq` - Main CLI
 
 ## TODO
 * Finish up Transformer and AST
