@@ -116,13 +116,19 @@ func TestStructs(t *testing.T) {
 
 func TestMod(t *testing.T) {
 	text := `
-	package main
+		package main
 
-	func main() {
-		transform.Mod("print('aaa')")
-		x := 10
-		transform.Mod("assert(x == 10, 'what')")
-	}
+		var _ = transform.Mod("local logger = require('logger')")
+
+		type Logger struct {}
+
+		func NewLogger() *Logger {
+		return transform.Mod("logger.new()")
+		}
+
+		func (l *Logger) Log(msg string) {
+		transform.Mod("logger.log(l, msg)")
+		}
 	`
 
 	src, err := Source("main.go", text)

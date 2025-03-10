@@ -1,10 +1,14 @@
 package luau
 
+import "go/ast"
+
+// ==================================
 // Base node
 type Node interface {
 	Render(w Writer)
 }
 
+// ==================================
 type Writer interface {
 	// Pre will add the indent but won't add the newline
 	Pre(s string) error
@@ -16,6 +20,17 @@ type Writer interface {
 	DecIndent()
 }
 
+// ==================================
+type File struct {
+	Name  string
+	Decls []ast.Node
+}
+
+func (f *File) Render(w Writer) {
+
+}
+
+// ==================================
 type Scope int
 
 const (
@@ -24,6 +39,7 @@ const (
 	NONE
 )
 
+// ==================================
 type Token int
 
 const (

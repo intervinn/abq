@@ -13,6 +13,9 @@ There are some limitations ABQ will aim to implement:
 
 * Every individual package is to be compiled and packed in a single file.
 
+## Modding
+ABQ placeholds one call expression - `transform.Mod`. It's string parameter 
+
 ## Projects
 `transform` - Go AST to Luau AST transformer
 `luau` - Luau AST, writer and other essentials

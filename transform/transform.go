@@ -103,7 +103,7 @@ func Spec(s ast.Spec, f *ast.File) (luau.Node, error) {
 	return nil, fmt.Errorf("unknown spec: %#v", s)
 }
 
-func ValueSpec(v *ast.ValueSpec, f *ast.File) (*luau.DeclStmt, error) {
+func ValueSpec(v *ast.ValueSpec, f *ast.File) (luau.Node, error) {
 	names := make([]luau.Node, len(v.Names))
 	for i, v := range v.Names {
 		names[i] = Ident(v, f)
@@ -117,6 +117,19 @@ func ValueSpec(v *ast.ValueSpec, f *ast.File) (*luau.DeclStmt, error) {
 		}
 
 		values[i] = e
+	}
+
+	// check if its a transform.Mod
+	if len(v.Names) == 1 && len(v.Values) == 1 {
+		value := v.Values[0]
+
+		if c, ok := value.(*ast.CallExpr); ok {
+			expr, err := CallExpr(c, f)
+
+			if raw, ok := expr.(*luau.Raw); ok && err == nil {
+				return raw, nil
+			}
+		}
 	}
 
 	return &luau.DeclStmt{

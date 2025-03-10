@@ -1,0 +1,5 @@
+package some
+
+func Some() {
+
+}
