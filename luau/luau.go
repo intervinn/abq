@@ -1,6 +1,6 @@
 package luau
 
-import "go/ast"
+import "slices"
 
 // ==================================
 // Base node
@@ -23,10 +23,39 @@ type Writer interface {
 // ==================================
 type File struct {
 	Name  string
-	Decls []ast.Node
+	Decls []Node
 }
 
 func (f *File) Render(w Writer) {
+	// decl order: raw -> decl -> func -> [the rest]
+	rendered := []int{}
+
+	for i, v := range f.Decls {
+		if _, ok := v.(*Raw); ok {
+			v.Render(w)
+			rendered = append(rendered, i)
+		}
+	}
+
+	for i, v := range f.Decls {
+		if _, ok := v.(*DeclStmt); ok {
+			v.Render(w)
+			rendered = append(rendered, i)
+		}
+	}
+
+	for i, v := range f.Decls {
+		if _, ok := v.(*FuncStmt); ok {
+			v.Render(w)
+			rendered = append(rendered, i)
+		}
+	}
+
+	for i, v := range f.Decls {
+		if !slices.Contains(rendered, i) {
+			v.Render(w)
+		}
+	}
 
 }
 

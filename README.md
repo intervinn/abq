@@ -18,19 +18,19 @@ One call expression will allow pasting any luau string which allows you to port 
 and it is `transform.Mod()`:
 
 ```go
-		package main
+package main
 
-		var _ = transform.Mod("local logger = require('logger')")
+var _ = transform.Mod("local logger = require('logger')")
 
-		type Logger struct {}
+type Logger struct {}
 
-		func NewLogger() *Logger {
-			return transform.Mod("logger.new()")
-		}
+func NewLogger() *Logger {
+	return transform.Mod("logger.new()")
+}
 
-		func (l *Logger) Log(msg string) {
-			transform.Mod("logger.log(l, msg)")
-		}
+func (l *Logger) Log(msg string) {
+	transform.Mod("logger.log(l, msg)")
+}
 ```
 
 Will turn into the following:

@@ -20,6 +20,10 @@ var Compile = &cobra.Command{
 		}
 
 		root := path.Join(cwd, arg)
+		out := path.Join(cwd, "out")
+
+		os.Mkdir(out, 0700)
+
 		f := os.DirFS(root)
 		fs.WalkDir(f, ".", func(p string, d fs.DirEntry, err error) error {
 			if d.IsDir() {

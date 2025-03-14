@@ -1,6 +1,7 @@
 package pack
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"slices"
@@ -24,7 +25,7 @@ func Dir(p string, dir fs.DirEntry) error {
 
 	for _, e := range entries {
 		if e.IsDir() {
-			continue
+			fmt.Println(e.Name())
 		}
 
 		if !strings.HasPrefix(e.Name(), ".go") {
