@@ -57,5 +57,6 @@ end
 ## TODO
 * Finish up Transformer and AST
 * Luau libraries polyfills
+* Importing
 * CLI
-* Packer and filesystem work
+* Enhance packing
