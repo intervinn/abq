@@ -116,22 +116,22 @@ func TestStructs(t *testing.T) {
 
 func TestMod(t *testing.T) {
 	text := `
-		package main
+		package logger
 
-		var _ = transform.Mod("local logger = require('logger')")
+		var _ = transform.Mod[any]("local logger = require('logger')")
 
-		type Logger struct {}
+		type Logger struct{}
 
 		func NewLogger() *Logger {
-			return transform.Mod("logger.new()")
+			return transform.Mod[*Logger]("return logger.new()")
 		}
 
 		func (l *Logger) Log(msg string) {
-			transform.Mod("logger.log(l, msg)")
+			_ = transform.Mod[any]("logger.msg(l, msg)")
 		}
 	`
 
-	src, err := Source("main.go", text)
+	src, err := Source("logger.go", text)
 	if err != nil {
 		t.Error(err)
 	}

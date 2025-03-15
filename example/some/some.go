@@ -1,5 +1,0 @@
-package some
-
-func Some() {
-
-}

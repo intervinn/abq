@@ -1,6 +1,7 @@
 package pack
 
 import (
+	"io"
 	"os"
 	"path"
 	"slices"
@@ -59,7 +60,10 @@ func (pc *Pack) Dir(p string) error {
 			if slices.Contains(Except, e.Name()) {
 				continue
 			}
-			pc.Dir(path.Join(p, e.Name()))
+			err = pc.Dir(path.Join(p, e.Name()))
+			if err != nil {
+				return err
+			}
 		}
 
 		if strings.HasSuffix(e.Name(), ".go") {
@@ -108,15 +112,37 @@ func (p *Pack) Render() error {
 		if err != nil {
 			return err
 		}
+		defer init.Close()
 
 		w := luau.NewStringWriter()
 		a.Render(w)
+
 		_, err = init.WriteString(w.Content)
 		if err != nil {
 			return err
 		}
 
 		// included files
+		for _, v := range a.Include {
+			src, err := os.Open(v)
+			if err != nil {
+				return err
+			}
+
+			defer src.Close()
+			dst, err := os.Create(path.Join(root, path.Base(v)))
+			if err != nil {
+				return err
+			}
+			defer dst.Close()
+
+			_, err = io.Copy(dst, src)
+			if err != nil {
+				return err
+			}
+
+			return dst.Sync()
+		}
 	}
 	return nil
 }

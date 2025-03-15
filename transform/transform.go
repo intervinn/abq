@@ -12,7 +12,10 @@ import (
 
 // transform.Mod is a reserved call expression
 // for rendering raw luau strings in where its written
-func Mod(value string) {}
+func Mod[T any](value string) T {
+	var a T
+	return a
+}
 
 // transform.Require is reserved
 // for making sure a certain compiled package is imported.
@@ -99,7 +102,7 @@ func Spec(s ast.Spec, f *ast.File) (luau.Node, error) {
 		return ValueSpec(spec, f)
 	case *ast.TypeSpec:
 		return TypeSpec(spec, f)
-	default:
+	case *ast.ImportSpec:
 		return &luau.Raw{Content: ""}, nil
 	}
 	return nil, fmt.Errorf("unknown spec: %#v", s)
@@ -269,6 +272,8 @@ func Expr(e ast.Expr, f *ast.File) (luau.Node, error) {
 		return CompositeLit(expr, f)
 	case *ast.UnaryExpr:
 		return UnaryExpr(expr, f)
+	case *ast.StarExpr:
+		return nil, nil
 	}
 	return nil, fmt.Errorf("unknown expression: %#v", e)
 }
@@ -351,10 +356,7 @@ func CallExpr(c *ast.CallExpr, f *ast.File) (luau.Node, error) {
 	}
 
 	args := []luau.Node{}
-
-	// check if its a struct method
-	if sl, ok := c.Fun.(*ast.SelectorExpr); ok {
-
+	method := func(sl *ast.SelectorExpr) (luau.Node, error) {
 		// check if its transform.Mod
 		if id, ok := sl.X.(*ast.Ident); ok && id.Name == "transform" && sl.Sel.Name == "Mod" {
 			ermsg := errors.New("transform.Mod must have exactly one string argument")
@@ -374,6 +376,22 @@ func CallExpr(c *ast.CallExpr, f *ast.File) (luau.Node, error) {
 		// if method has an object, add self arg
 		if id, ok := sl.X.(*ast.Ident); ok && id.Obj != nil {
 			args = append(args, Ident(id, f))
+		}
+		return nil, nil
+	}
+
+	// check if its a struct method
+	if sl, ok := c.Fun.(*ast.SelectorExpr); ok {
+		if node, err := method(sl); node != nil {
+			return node, err
+		}
+	}
+
+	if il, ok := c.Fun.(*ast.IndexExpr); ok {
+		if sl, ok := il.X.(*ast.SelectorExpr); ok {
+			if node, err := method(sl); node != nil {
+				return node, err
+			}
 		}
 	}
 
