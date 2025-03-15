@@ -1,6 +1,8 @@
 package luau
 
-import "slices"
+import (
+	"slices"
+)
 
 // ==================================
 // Base node
@@ -22,8 +24,10 @@ type Writer interface {
 
 // ==================================
 type File struct {
-	Name  string
-	Decls []Node
+	Name    string
+	Decls   []Node
+	Include []string
+	Out     string // render destination
 }
 
 func (f *File) Render(w Writer) {
@@ -57,6 +61,15 @@ func (f *File) Render(w Writer) {
 		}
 	}
 
+}
+
+func NewFile(name string, out string) *File {
+	return &File{
+		Name:    name,
+		Decls:   []Node{},
+		Include: []string{},
+		Out:     out,
+	}
 }
 
 // ==================================

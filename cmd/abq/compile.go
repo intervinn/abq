@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/fs"
 	"os"
 	"path"
 
@@ -24,14 +23,16 @@ var Compile = &cobra.Command{
 
 		os.Mkdir(out, 0700)
 
-		f := os.DirFS(root)
-		fs.WalkDir(f, ".", func(p string, d fs.DirEntry, err error) error {
-			if d.IsDir() {
-				pack.Dir(p, d)
-			}
+		p := pack.NewPack(out)
+		err = p.Dir(root)
+		if err != nil {
+			return err
+		}
 
-			return nil
-		})
+		err = p.Render()
+		if err != nil {
+			return err
+		}
 
 		return nil
 	},

@@ -99,6 +99,8 @@ func Spec(s ast.Spec, f *ast.File) (luau.Node, error) {
 		return ValueSpec(spec, f)
 	case *ast.TypeSpec:
 		return TypeSpec(spec, f)
+	default:
+		return &luau.Raw{Content: ""}, nil
 	}
 	return nil, fmt.Errorf("unknown spec: %#v", s)
 }
