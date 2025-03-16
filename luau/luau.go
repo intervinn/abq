@@ -1,9 +1,5 @@
 package luau
 
-import (
-	"slices"
-)
-
 // ==================================
 // Base node
 type Node interface {
@@ -31,34 +27,40 @@ type File struct {
 }
 
 func (f *File) Render(w Writer) {
-	// decl order: raw -> decl -> func -> [the rest]
-	rendered := []int{}
+	/*
+		// decl order: raw -> decl -> func -> [the rest]
+		rendered := []int{}
 
-	for i, v := range f.Decls {
-		if _, ok := v.(*Raw); ok {
-			v.Render(w)
-			rendered = append(rendered, i)
+		for i, v := range f.Decls {
+			if _, ok := v.(*Raw); ok {
+				v.Render(w)
+				rendered = append(rendered, i)
+			}
 		}
-	}
 
-	for i, v := range f.Decls {
-		if _, ok := v.(*DeclStmt); ok {
-			v.Render(w)
-			rendered = append(rendered, i)
+		for i, v := range f.Decls {
+			if _, ok := v.(*DeclStmt); ok {
+				v.Render(w)
+				rendered = append(rendered, i)
+			}
 		}
-	}
 
-	for i, v := range f.Decls {
-		if _, ok := v.(*FuncStmt); ok {
-			v.Render(w)
-			rendered = append(rendered, i)
+		for i, v := range f.Decls {
+			if _, ok := v.(*FuncStmt); ok {
+				v.Render(w)
+				rendered = append(rendered, i)
+			}
 		}
-	}
 
-	for i, v := range f.Decls {
-		if !slices.Contains(rendered, i) {
-			v.Render(w)
+		for i, v := range f.Decls {
+			if !slices.Contains(rendered, i) {
+				v.Render(w)
+			}
 		}
+	*/
+
+	for _, v := range f.Decls {
+		v.Render(w)
 	}
 
 }

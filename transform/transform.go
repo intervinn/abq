@@ -6,9 +6,65 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"strings"
+	"unicode"
 
 	"github.com/intervinn/abq/luau"
 )
+
+func addIdent(id *luau.Ident, lit *luau.TableLit) {
+	lit.Elts = append(lit.Elts, &luau.KeyValueExpr{
+		Key:   id,
+		Value: id,
+	})
+}
+
+func exportDecl(decl luau.Node) *luau.TableLit {
+	res := &luau.TableLit{}
+
+	switch d := decl.(type) {
+	default:
+		fmt.Printf("%#v\n", d)
+	case *luau.Block:
+		for _, v := range d.List {
+			rlit := exportDecl(v)
+			if rlit != nil {
+				res.Elts = append(res.Elts, rlit.Elts...)
+			}
+		}
+	case *luau.DeclStmt:
+		for _, n := range d.Names {
+			if id, ok := n.(*luau.Ident); ok && unicode.IsUpper(rune(id.Name[0])) {
+				addIdent(id, res)
+			}
+		}
+	case *luau.FuncStmt:
+		name := d.Name
+		if len(strings.Split(d.Name.Name, ".")) > 1 {
+			return nil
+		}
+		addIdent(name, res)
+	}
+	return res
+}
+
+// export top-level variables and funcs
+func Exports(f *luau.File) luau.Node {
+	lit := &luau.TableLit{
+		Elts: []luau.Node{},
+	}
+
+	for _, d := range f.Decls {
+		res := exportDecl(d)
+		if res != nil {
+			lit.Elts = append(lit.Elts, res.Elts...)
+		}
+	}
+
+	return &luau.ReturnStmt{
+		Results: []luau.Node{lit},
+	}
+}
 
 // transform.Mod is a reserved call expression
 // for rendering raw luau strings in where its written
@@ -103,9 +159,40 @@ func Spec(s ast.Spec, f *ast.File) (luau.Node, error) {
 	case *ast.TypeSpec:
 		return TypeSpec(spec, f)
 	case *ast.ImportSpec:
-		return &luau.Raw{Content: ""}, nil
+		return ImportSpec(spec, f)
 	}
 	return nil, fmt.Errorf("unknown spec: %#v", s)
+}
+
+func ImportSpec(i *ast.ImportSpec, f *ast.File) (luau.Node, error) {
+	ident := i.Name
+	name := ""
+	if ident == nil {
+		parts := strings.Split(i.Path.Value, "/")
+		name = parts[len(parts)-2] // consider the " at the end
+	} else {
+		name = ident.Name
+	}
+
+	return &luau.DeclStmt{
+		Scope: luau.LOCAL,
+		Names: []luau.Node{
+			&luau.Ident{
+				Name: name,
+			},
+		},
+		Values: []luau.Node{
+			&luau.CallExpr{
+				Args: []luau.Node{
+					&luau.Ident{Name: i.Path.Value},
+				},
+				Fun: &luau.SelectorExpr{
+					X:   &luau.Ident{Name: "GO"},
+					Sel: &luau.Ident{Name: "import"},
+				},
+			},
+		},
+	}, nil
 }
 
 func ValueSpec(v *ast.ValueSpec, f *ast.File) (luau.Node, error) {

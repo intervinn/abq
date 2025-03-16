@@ -108,6 +108,12 @@ func (p *Pack) Render() error {
 		}
 
 		// init.luau
+
+		// final transformations
+		// TODO: move in a more suitable place
+		a.Decls = append(a.Decls, transform.Exports(a)) // export table
+
+		// create file
 		init, err := os.Create(path.Join(root, "init.luau"))
 		if err != nil {
 			return err

@@ -7,6 +7,7 @@ type Raw struct {
 
 func (r *Raw) Render(w Writer) {
 	w.Write(r.Content)
+	w.Write("\n")
 }
 
 // Chunk is a basic container of nodes with indentation considered

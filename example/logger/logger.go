@@ -2,7 +2,7 @@ package logger
 
 import "github.com/intervinn/abq/transform"
 
-var _ = transform.Mod[any]("local logger = require(\"logger\")")
+var _ = transform.Mod[any]("local logger = require('logger')")
 
 type Logger struct{}
 
