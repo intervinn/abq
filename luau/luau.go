@@ -20,6 +20,7 @@ type Writer interface {
 
 // ==================================
 type File struct {
+	Imports []*ImportDecl
 	Name    string
 	Decls   []Node
 	Include []string

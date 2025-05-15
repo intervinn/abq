@@ -14,8 +14,7 @@ There are some limitations ABQ will aim to implement:
 * Every individual package is to be compiled and packed in a single file.
 
 ## Modding
-One call expression will allow pasting any luau string which allows you to port existent Luau code to Go,
-and it is `transform.Mod()`:
+One call expression will allow pasting any luau string which allows you to port existent Luau code to Go: `transform.Mod()`:
 
 ```go
 package main
@@ -51,7 +50,7 @@ end
 ## Projects
 * `transform` - Go AST to Luau AST transformer
 * `luau` - Luau AST, writer and other essentials
-* `transform/pack` - Packaging and working with FS
+* `transform/pack` - Import resolving and building packages
 * `cmd/abq` - Main CLI
 
 ## TODO

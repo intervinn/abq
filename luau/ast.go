@@ -1,5 +1,10 @@
 package luau
 
+type ImportDecl struct {
+	Path string
+	As   string
+}
+
 // Raw renderable string
 type Raw struct {
 	Content string

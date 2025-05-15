@@ -85,6 +85,7 @@ func (pc *Pack) Dir(p string) error {
 			asm.Decls = append(asm.Decls, src...)
 		}
 
+		// If a folder contains Luau file - just move it to out folder
 		if strings.HasSuffix(e.Name(), ".luau") {
 			asm := pc.Assembled(dir)
 			if asm == nil {
