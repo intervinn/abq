@@ -17,6 +17,7 @@ var Except = []string{
 }
 
 type Pack struct {
+	Package  string
 	Assembly []*luau.File
 	Out      string // outdir root
 }
