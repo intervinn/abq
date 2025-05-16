@@ -24,7 +24,7 @@ var Compile = &cobra.Command{
 		os.Mkdir(out, 0700)
 
 		p := pack.NewPack(out)
-		err = p.Dir(root)
+		err = p.Rojo(root, out)
 		if err != nil {
 			return err
 		}

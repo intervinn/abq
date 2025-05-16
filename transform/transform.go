@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"path"
 	"strings"
 	"unicode"
 
@@ -168,8 +169,8 @@ func ImportSpec(i *ast.ImportSpec, f *ast.File) (luau.Node, error) {
 	ident := i.Name
 	name := ""
 	if ident == nil {
-		parts := strings.Split(i.Path.Value, "/")
-		name = parts[len(parts)-2] // consider the " at the end
+		name = path.Base(i.Path.Value)
+		name = name[:len(name)-1] // trim quote
 	} else {
 		name = ident.Name
 	}
@@ -184,7 +185,7 @@ func ImportSpec(i *ast.ImportSpec, f *ast.File) (luau.Node, error) {
 		Values: []luau.Node{
 			&luau.CallExpr{
 				Args: []luau.Node{
-					&luau.Ident{Name: i.Path.Value},
+					&luau.Ident{Name: i.Path.Value[:len(i.Path.Value)]},
 				},
 				Fun: &luau.SelectorExpr{
 					X:   &luau.Ident{Name: "GO"},
@@ -260,6 +261,10 @@ func FuncDecl(f *ast.FuncDecl, file *ast.File) (*luau.FuncStmt, error) {
 
 	if f.Recv != nil {
 		r := f.Recv.List[0]
+		if len(r.Names) == 0 {
+			return nil, errors.New("function receiver lacks identifier")
+		}
+
 		i := Ident(r.Names[0], file)
 
 		params = append([]*luau.Ident{i}, params...)
@@ -299,7 +304,7 @@ func BasicLit(l *ast.BasicLit) (luau.Node, error) {
 }
 
 func CompositeLit(l *ast.CompositeLit, f *ast.File) (luau.Node, error) {
-	switch l.Type.(type) {
+	switch c := l.Type.(type) {
 	case *ast.ArrayType, *ast.MapType, *ast.Ident:
 		elts := make([]luau.Node, len(l.Elts))
 		for i, v := range l.Elts {
@@ -315,6 +320,17 @@ func CompositeLit(l *ast.CompositeLit, f *ast.File) (luau.Node, error) {
 		}, nil
 	case *ast.ChanType:
 		return nil, errors.New("channels not supported")
+	case *ast.SelectorExpr:
+		x, err := Expr(c.X, f)
+		if err != nil {
+			return nil, err
+		}
+
+		return &luau.SelectorExpr{
+			X:   x,
+			Sel: Ident(c.Sel, f),
+		}, nil
+
 	}
 	return nil, fmt.Errorf("unknown composite literal: %#v", l)
 }
@@ -372,14 +388,23 @@ func UnaryExpr(u *ast.UnaryExpr, f *ast.File) (luau.Node, error) {
 	}
 
 	// if constructing a struct
-	if _, ok := u.X.(*ast.CompositeLit); ok && u.Op == token.AND {
+	if c, ok := u.X.(*ast.CompositeLit); ok && u.Op == token.AND {
+		elts := make([]luau.Node, len(c.Elts))
+		for i, v := range c.Elts {
+			res, err := Expr(v, f)
+			if err != nil {
+				return nil, err
+			}
+			elts[i] = res
+		}
+
 		return &luau.CallExpr{
 			Fun: &luau.Ident{
 				Name: "setmetatable",
 			},
 			Args: []luau.Node{
 				&luau.TableLit{
-					Elts: []luau.Node{},
+					Elts: elts,
 				},
 				x,
 			},
@@ -490,10 +515,15 @@ func CallExpr(c *ast.CallExpr, f *ast.File) (luau.Node, error) {
 		args = append(args, e)
 	}
 
-	return &luau.CallExpr{
+	call := &luau.CallExpr{
 		Fun:  fn,
 		Args: args,
-	}, nil
+	}
+
+	if macro, ok := MacroCallExpr(call); ok {
+		return macro, nil
+	}
+	return call, nil
 }
 func IndexExpr(i *ast.IndexExpr, f *ast.File) (*luau.IndexExpr, error) {
 	x, err := Expr(i.X, f)

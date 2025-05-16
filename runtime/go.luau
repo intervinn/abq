@@ -1,6 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local IMPORT_ROOT = ReplicatedStorage:FindFirstChild("ABQ"):FindFirstChild("Include")
+local IMPORT_ROOT = ReplicatedStorage:FindFirstChild("go_include")
 
 local go = {}
 
@@ -10,7 +10,7 @@ function go.import(str: string)
     for _, p in parts do
         part = part:FindFirstChild(str)
     end
-    return part
+    return require(part)
 end
 
 return go

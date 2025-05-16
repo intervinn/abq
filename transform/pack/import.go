@@ -2,13 +2,17 @@ package pack
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
-	"strings"
 
-	"github.com/intervinn/abq/luau"
 	"golang.org/x/mod/modfile"
 )
+
+/*
+	/shared/things.go -> /shared/go_include/github.com/.../shared/things.go
+	github.com/gofiber/fiber -> /shared/go_include/github.com/fiber
+*/
 
 func pkgDir() string {
 	return "~/go/pkg/mod"
@@ -26,6 +30,7 @@ func dirExists(path string) bool {
 	return false
 }
 
+/*
 func isVersioned() {
 
 }
@@ -53,7 +58,23 @@ func resolveExternal(i *luau.ImportDecl, field modfile.Require) *Pack {
 		Out:      "TODO: add outdir/shared/go_include",
 	}
 }
+*/
 
-func ResolveImport(i *luau.ImportDecl) luau.Node {
-	return &luau.Raw{}
+func ReadModfile(src string) (*modfile.File, error) {
+	modsrc, err := os.ReadFile(src)
+	if err != nil {
+		return nil, err
+	}
+
+	mod, err := modfile.Parse("go.mod", modsrc, nil)
+	return mod, err
+}
+
+func ResolveImports(mod *modfile.File) ([]*Pack, error) {
+	res := []*Pack{}
+	for _, r := range mod.Require {
+		fmt.Println(r.Syntax.Comments.Suffix)
+	}
+
+	return res, nil
 }

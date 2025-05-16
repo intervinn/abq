@@ -1,6 +1,7 @@
 package pack
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path"
@@ -20,6 +21,54 @@ type Pack struct {
 	Package  string
 	Assembly []*luau.File
 	Out      string // outdir root
+}
+
+func (p *Pack) Add(p2 *Pack) {
+	p.Assembly = append(p.Assembly, p2.Assembly...)
+}
+
+// Assemble a rojo project
+func (p *Pack) Rojo(root string, out string) error {
+	// Iterate over dependencies and add them to assembly
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	mod, err := ReadModfile(path.Join(cwd, "go.mod"))
+	if err != nil {
+		return err
+	}
+
+	server := NewPack(path.Join(out))
+	if err = server.Dir(path.Join(root, "server")); err != nil {
+		return fmt.Errorf("failed to build server: %v", err)
+	}
+
+	client := NewPack(path.Join(out))
+	if err = client.Dir(path.Join(root, "client")); err != nil {
+		return fmt.Errorf("failed to build client: %v", err)
+	}
+
+	shared := NewPack(path.Join(out, "shared", "go_include", mod.Module.Mod.Path))
+	if err = shared.Dir(path.Join(root, "shared")); err != nil {
+		return fmt.Errorf("failed to build shared: %v", err)
+	}
+
+	imports, err := ResolveImports(mod)
+	for _, i := range imports {
+		p.Add(i)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	p.Add(server)
+	p.Add(client)
+	p.Add(shared)
+
+	return nil
 }
 
 func (pc *Pack) Assembled(name string) *luau.File {
@@ -102,6 +151,7 @@ func (pc *Pack) Dir(p string) error {
 }
 
 func (p *Pack) Render() error {
+
 	for _, a := range p.Assembly {
 		root := a.Out
 		err := os.MkdirAll(root, 0700)
@@ -112,6 +162,7 @@ func (p *Pack) Render() error {
 		// init.luau
 
 		// final transformations
+
 		// TODO: move in a more suitable place
 		a.Decls = append(a.Decls, transform.Exports(a)) // export table
 
