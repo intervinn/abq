@@ -3,6 +3,7 @@ package pack
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path"
 	"slices"
@@ -40,33 +41,39 @@ func (p *Pack) Rojo(root string, out string) error {
 		return err
 	}
 
+	log.Println("building server")
 	server := NewPack(path.Join(out))
 	if err = server.Dir(path.Join(root, "server")); err != nil {
 		return fmt.Errorf("failed to build server: %v", err)
 	}
 
+	log.Println("building client")
 	client := NewPack(path.Join(out))
 	if err = client.Dir(path.Join(root, "client")); err != nil {
 		return fmt.Errorf("failed to build client: %v", err)
 	}
 
+	log.Println("building shared")
 	shared := NewPack(path.Join(out, "shared", "go_include", mod.Module.Mod.Path))
 	if err = shared.Dir(path.Join(root, "shared")); err != nil {
 		return fmt.Errorf("failed to build shared: %v", err)
 	}
 
-	imports, err := ResolveImports(mod)
-	for _, i := range imports {
-		p.Add(i)
-	}
+	log.Println("resolving imports")
+	imports, err := ResolveImports(mod, path.Join(out, "shared", "go_include"))
 
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to resolve imports: %v", err)
 	}
 
+	log.Println("connecting assemblies...")
 	p.Add(server)
 	p.Add(client)
 	p.Add(shared)
+
+	for _, i := range imports {
+		p.Add(i)
+	}
 
 	return nil
 }
@@ -128,8 +135,10 @@ func (pc *Pack) Dir(p string) error {
 				return err
 			}
 
+			log.Printf("building %s", e.Name())
 			src, err := transform.Source(e.Name(), str)
 			if err != nil {
+				log.Printf("file %v failed to build\n", e.Name())
 				return err
 			}
 			asm.Decls = append(asm.Decls, src...)

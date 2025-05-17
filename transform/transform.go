@@ -129,13 +129,19 @@ func Parse(name string, src string) (*ast.File, error) {
 	return parser.ParseFile(token.NewFileSet(), name, src, parser.AllErrors)
 }
 
+var lastDecl ast.Decl
+
 func Decl(d ast.Decl, f *ast.File) (luau.Node, error) {
+
 	switch decl := d.(type) {
 	case *ast.FuncDecl:
 		return FuncDecl(decl, f)
 	case *ast.GenDecl:
 		return GenDecl(decl, f)
 	}
+
+	lastDecl = d
+
 	return nil, fmt.Errorf("unknown declaration: %#v", d)
 }
 
@@ -304,7 +310,7 @@ func BasicLit(l *ast.BasicLit) (luau.Node, error) {
 }
 
 func CompositeLit(l *ast.CompositeLit, f *ast.File) (luau.Node, error) {
-	switch c := l.Type.(type) {
+	switch t := l.Type.(type) {
 	case *ast.ArrayType, *ast.MapType, *ast.Ident:
 		elts := make([]luau.Node, len(l.Elts))
 		for i, v := range l.Elts {
@@ -321,15 +327,16 @@ func CompositeLit(l *ast.CompositeLit, f *ast.File) (luau.Node, error) {
 	case *ast.ChanType:
 		return nil, errors.New("channels not supported")
 	case *ast.SelectorExpr:
-		x, err := Expr(c.X, f)
+		x, err := Expr(t.X, f)
 		if err != nil {
 			return nil, err
 		}
 
 		return &luau.SelectorExpr{
 			X:   x,
-			Sel: Ident(c.Sel, f),
+			Sel: Ident(t.Sel, f),
 		}, nil
+	case *ast.StructType:
 
 	}
 	return nil, fmt.Errorf("unknown composite literal: %#v", l)
@@ -339,6 +346,7 @@ func Chunk(b *ast.BlockStmt, f *ast.File) (*luau.Chunk, error) {
 	ls := b.List
 	result := make([]luau.Node, len(ls))
 	for i, v := range ls {
+		fmt.Printf("%#v\n", v)
 		s, err := Stmt(v, f)
 		if err != nil {
 			return nil, err
@@ -351,7 +359,14 @@ func Chunk(b *ast.BlockStmt, f *ast.File) (*luau.Chunk, error) {
 	}, nil
 }
 
+var prevExpr ast.Expr
+
 func Expr(e ast.Expr, f *ast.File) (luau.Node, error) {
+	if e == nil {
+		fmt.Printf("nil expr: %#v\n", prevExpr)
+		return nil, nil
+	}
+
 	switch expr := e.(type) {
 	case *ast.BadExpr:
 		return nil, errors.New("bad expression")
@@ -375,10 +390,48 @@ func Expr(e ast.Expr, f *ast.File) (luau.Node, error) {
 		return CompositeLit(expr, f)
 	case *ast.UnaryExpr:
 		return UnaryExpr(expr, f)
+	case *ast.SliceExpr:
+		return SliceExpr(expr, f)
 	case *ast.StarExpr:
 		return nil, nil
 	}
+
+	prevExpr = e
+
 	return nil, fmt.Errorf("unknown expression: %#v", e)
+}
+
+func SliceExpr(s *ast.SliceExpr, f *ast.File) (luau.Node, error) {
+	if s.Slice3 {
+		return nil, fmt.Errorf("3-index slices are not supported")
+	}
+
+	low, err := Expr(s.Low, f)
+	if err != nil {
+		return nil, err
+	}
+
+	max, err := Expr(s.Max, f)
+	if err != nil {
+		return nil, err
+	}
+
+	x, err := Expr(s.X, f)
+	if err != nil {
+		return nil, err
+	}
+
+	return &luau.CallExpr{
+		Fun: &luau.SelectorExpr{
+			X: &luau.Ident{
+				Name: "GO",
+			},
+			Sel: &luau.Ident{
+				Name: "slice",
+			},
+		},
+		Args: []luau.Node{x, low, max},
+	}, nil
 }
 
 func UnaryExpr(u *ast.UnaryExpr, f *ast.File) (luau.Node, error) {
@@ -564,7 +617,14 @@ func SelectorExpr(s *ast.SelectorExpr, f *ast.File) (*luau.SelectorExpr, error) 
 	}, nil
 }
 
+var prevStmt ast.Stmt
+
 func Stmt(s ast.Stmt, f *ast.File) (luau.Node, error) {
+	if s == nil {
+		fmt.Println("nil statement: %#v\n", prevStmt)
+		return nil, nil
+	}
+
 	switch stmt := s.(type) {
 	case *ast.AssignStmt:
 		return AssignStmt(stmt, f)
@@ -576,8 +636,32 @@ func Stmt(s ast.Stmt, f *ast.File) (luau.Node, error) {
 		return IfStmt(stmt, f)
 	case *ast.ReturnStmt:
 		return ReturnStmt(stmt, f)
+	case *ast.RangeStmt:
+		return RangeStmt(stmt, f)
+	case *ast.ForStmt:
+		return ForStmt(stmt, f)
 	}
+	prevStmt = s
 	return nil, fmt.Errorf("unknown statement: %#v", s)
+}
+
+func ForStmt(s *ast.ForStmt, f *ast.File) (luau.Node, error) {
+	body, err := Chunk(s.Body, f)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.Init == nil && s.Cond == nil && s.Post == nil {
+		return &luau.WhileStmt{
+			Exp:   &luau.Raw{Content: "true"},
+			Chunk: body,
+		}, nil
+	}
+
+	return &luau.NumericForStmt{
+		Chunk: body,
+		// CONTINUE WORK HERE
+	}, nil
 }
 
 func IfStmt(i *ast.IfStmt, f *ast.File) (*luau.IfStmt, error) {
@@ -671,5 +755,38 @@ func ReturnStmt(r *ast.ReturnStmt, f *ast.File) (*luau.ReturnStmt, error) {
 
 	return &luau.ReturnStmt{
 		Results: res,
+	}, nil
+}
+
+func RangeStmt(r *ast.RangeStmt, f *ast.File) (*luau.GenericForStmt, error) {
+	k, err := Expr(r.Key, f)
+	if err != nil {
+		return nil, err
+	}
+	if k == nil {
+		k = &luau.Ident{
+			Name: "_",
+		}
+	}
+
+	v, err := Expr(r.Value, f)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := Chunk(r.Body, f)
+	if err != nil {
+		return nil, err
+	}
+
+	iter, err := Expr(r.X, f)
+	if err != nil {
+		return nil, err
+	}
+
+	return &luau.GenericForStmt{
+		Chunk:  body,
+		Idents: []*luau.Ident{k.(*luau.Ident), v.(*luau.Ident)},
+		Iter:   iter,
 	}, nil
 }
