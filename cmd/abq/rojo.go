@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var Compile = &cobra.Command{
-	Use:  "compile",
+var Rojo = &cobra.Command{
+	Use:  "rojo",
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		arg := args[0]

@@ -15,7 +15,8 @@ var root = &cobra.Command{
 }
 
 func init() {
-	root.AddCommand(Compile)
+	root.AddCommand(Rojo)
+	root.AddCommand(Build)
 }
 
 func main() {

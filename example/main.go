@@ -1,4 +1,0 @@
-package example
-
-func main() {
-}

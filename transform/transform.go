@@ -175,6 +175,7 @@ func ImportSpec(i *ast.ImportSpec, f *ast.File) (luau.Node, error) {
 	ident := i.Name
 	name := ""
 	if ident == nil {
+
 		name = path.Base(i.Path.Value)
 		name = name[:len(name)-1] // trim quote
 	} else {
